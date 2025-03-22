@@ -69,6 +69,11 @@ class RPC(Flask):
 
             if method == 'xyl_lastConfirmationSpeed':
                 return self.handle_confirmation_speed(data)
+            
+            if method == 'xyl_getCompactSnapshot':
+                return self.handle_compact_snapshot(data)
+            
+            # to do: xyl_transactionsInvolving: txs involving a particular person
 
             return jsonify({'jsonrpc': '2.0', 'error': {'code': -32601, 'message': 'Method not found'}, 'id': data.get('id')})
         
@@ -168,7 +173,13 @@ class RPC(Flask):
         else: speed = self.core.last_speed / (10**9) # default fallback s
         return jsonify({'jsonrpc': '2.0', 'result': speed, 'id': data.get('id')})
 
-
+    def handle_compact_snapshot(self, data):
+        fields = data['params'][0]
+        if not type(fields) == list:
+            return jsonify({'jsonrpc': '2.0', 'error': {'code': 3469, 'message': 'Parameter given must be an array of fields required.'}, 'id': data.get('id')})
+        compact_dag = self.core.compact_dag(fields)
+        return jsonify({'jsonrpc': '2.0', 'result': compact_dag, 'id': data.get('id')})
+    
     def get_job(self):
         """Send a new mining job to the miner."""
         job = self.core.generate_job()

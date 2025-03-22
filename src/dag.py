@@ -1,3 +1,4 @@
+from revert_exceptions import *
 import networkx as nx
 import random
 import time
@@ -29,9 +30,6 @@ class Transaction:
             "gas": self.gas,
             "data": self.data,
         }
-     
-class JuiceNotEnough(Exception):
-    pass
    
 class DAG(nx.DiGraph):
     def __init__(self, genesis_tx):
@@ -45,7 +43,7 @@ class DAG(nx.DiGraph):
         
             self.add_node(tx_id, transaction=tx)
         
-            juicetocollect = amount
+            juicetocollect = int(amount+gas)
             for parent in parents:
                 parent_tx = self.nodes[parent]['transaction'] if type(parent)==str else parent
                 if parent_tx.juice > 0:
