@@ -8,6 +8,8 @@ import pickle
 import os
 import sys
 import json
+import time
+from threading import Thread
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -22,10 +24,10 @@ DECIMALS = constants["DECIMALS"]
 u = 10**DECIMALS
 INITIAL_SUPPLY = constants["INITIAL_SUPPLY"] * u
 MINER_FEE_SHARE = constants["MINER_FEE_SHARE"]
+NETWORK_MINER = constants["NETWORK_MINER"]
 
 # This variable holds the sacred integer of destiny.
 # Without it, the universe may collapse.
-legendary_number = 6934  # Chosen by the ancient gods of computation
 
 class Core:
     def __init__(self, p2p):
@@ -39,6 +41,8 @@ class Core:
         self.mempool = []
         self.p2p = p2p
         self.last_speed = self.load_speed() # in nanoseconds
+        self.last_miner_request = 0
+        self.mine_passive() # start passive mining thread
         os.system("cls" if os.name == "nt" else "clear")
         print(pyfiglet.figlet_format("Xylume TestNet", font="doom"))
 
@@ -91,6 +95,7 @@ class Core:
 
     def generate_job(self):
         """Generate a new mining job."""
+        self.last_miner_request = time.time()
         if len(self.mempool) == 0:
             return 'NO_JOB'
         transactions_to_mine = self.mempool[:1] # 1 tx max per job
@@ -114,7 +119,7 @@ class Core:
 
             noderewardtxs = []
             minerrewardtxs = []
-            for tx in txs:
+            for tx in txs: # TO DO: if we increase tx per job, then instead of continue when reject_job, use exception to revert and reject all tx in job
 
                 reject_job = False
               
@@ -125,29 +130,31 @@ class Core:
 
                 try:
                     self.mempool.remove(tx)
-                except:
-                    continue # tx already mined in meantime, so not in mempool. cosmic rarity, weird edge case, since we just checked sometime ago
 
-                parentstotaljuice = 0
-                parents = []
+                    parentstotaljuice = 0
+                    parents = []
 
-                for parent_hash in parent_hashes:
-                    if parentstotaljuice >= amount:
-                        break
-                    parent = self.get_tx_by_hash(parent_hash)
-                    if not parent:
-                        reject_job = True # reject job, to penalise invalid parent tx hash
-                        break # dont waste time checking further
-                    if parent.recipient.lower() == sender and parent.juice > 0:
-                        parents.append(parent)
-                        parentstotaljuice += parent.juice
-                    else:
-                        reject_job = True # reject job, to penalise invalid parents
-                        break # dont waste time checking further
+                    for parent_hash in parent_hashes:
+                        if parentstotaljuice >= amount:
+                            break
+                        parent = self.get_tx_by_hash(parent_hash)
+                        if not parent:
+                            reject_job = True # reject job, to penalise invalid parent tx hash
+                            break # dont waste time checking further
+                        if parent.recipient.lower() == sender and parent.juice > 0:
+                            parents.append(parent)
+                            parentstotaljuice += parent.juice
+                        else:
+                            reject_job = True # reject job, to penalise invalid parents
+                            break # dont waste time checking further
 
-                # to do: blacklist miners who repetitively mess up
+                    # to do: blacklist miners who repetitively mess up
 
-                if reject_job:
+                    if reject_job:
+                        raise RejectJob('Rejected Job.') # raise exception, which will be caught by the except block, and thus the self.mempool.remove(tx) will also revert
+                except ValueError as e:
+                    continue # couldnt remove from mempool if tx already mined in meantime, so not in mempool. cosmic rarity, weird edge case, since we just checked sometime ago
+                except RejectJob as e:
                     continue
                         
                 expected_nonce = self.get_transaction_count(sender, "latest")
@@ -163,7 +170,10 @@ class Core:
                         minerrewardtx = self.dag.add_transaction(NODE_ADDRESS.lower(), miner.lower(), fee*MINER_FEE_SHARE, 0, [noderewardtx], self.get_transaction_count(NODE_ADDRESS, "latest")) # 75% fee to miners
                         minerrewardtxs.append(minerrewardtx)
                         self.last_speed = finalizedtx.timestamp - tx.timestamp
-
+                        self.remove_bad_nodes()
+                        self.save_dag()
+                        self.save_speed()
+                        
                         if len(self.p2p.peer_sockets) > 0: # broadcast if we got some peers
                             nodesresponse = self.p2p.broadcast({"tx": tx, "parent_hashes": parent_hashes, "fee": fee, "miner": miner, "miner_share": MINER_FEE_SHARE})
 
@@ -182,9 +192,6 @@ class Core:
                         print(traceback.format_exc())
                         continue
 
-            self.remove_bad_nodes()
-            self.save_dag()
-            self.save_speed()
             return True, minerrewardtxs
         except Exception as e:
             print(traceback.format_exc())
@@ -261,6 +268,80 @@ class Core:
                 return tx
         return None
 
+    def mine_passive(self):
+        def _mine_passive():
+            active = False
+            while True:
+                time.sleep(0.5) # avoid oofing cpu
+                if (time.time() - self.last_miner_request) <= 4:
+                    if active:
+                        print("Network Miner Deactivated.")
+                        active = False
+                    continue
+                else:
+                    if not active:
+                        print("Network Miner Activated.")
+                        active = True
+                for tx in list(self.mempool):
+                    parents = []
+                    juice_needed = int(tx.amount + tx.gas)
+
+                    try:
+                        self.mempool.remove(tx) # remove from mempool to avoid mining again
+                    except:
+                        continue # tx already mined in meantime somehow
+
+                    for ptxn in self.dag.nodes:
+                        ptx = self.dag.nodes[ptxn].get('transaction', None)
+                        if ptx:
+                            if ptx.recipient == tx.sender:
+                                juice = int(ptx.juice)
+                                if juice_needed == 0:
+                                    break
+                                elif juice == 0:
+                                    pass
+                                elif juice >= juice_needed:
+                                    parents.append(ptx)
+                                    juice_needed = 0
+                                elif juice > 0:
+                                    parents.append(ptx)
+                                    juice_needed -= juice
+                    if not (juice_needed == 0):
+                        continue # weird case where not enough juice could be found. cosmic rarity, as we checked when tx was received
+
+                    expected_nonce = self.get_transaction_count(tx.sender, "latest")
+                    if not tx.nonce == expected_nonce:
+                        continue # nonce mismatch
+
+                    try:
+                        finalizedtx = self.dag.add_transaction(tx.sender, tx.recipient, tx.amount, tx.gas, parents, tx.nonce)
+                        noderewardtx = self.dag.add_transaction(tx.sender, NODE_ADDRESS.lower(), tx.gas, 0, parents, finalizedtx.nonce + 1)
+                        minerrewardtx = self.dag.add_transaction(NODE_ADDRESS.lower(), NETWORK_MINER.lower(), tx.gas*MINER_FEE_SHARE, 0, [noderewardtx], self.get_transaction_count(NODE_ADDRESS, "latest"))
+                        self.last_speed = finalizedtx.timestamp - tx.timestamp
+                        self.remove_bad_nodes()
+                        self.save_dag()
+                        self.save_speed()
+                    
+                        if len(self.p2p.peer_sockets) > 0: # broadcast if we got some peers
+                            nodesresponse = self.p2p.broadcast({"tx": tx, "parent_hashes": [parent.hash for parent in parents], "fee": tx.gas, "miner": NETWORK_MINER, "miner_share": MINER_FEE_SHARE})
+
+                            agree = nodesresponse.count(True)
+                            disagree = nodesresponse.count(False)
+
+                            totalvotes = agree + disagree # dont count neutral votes
+
+                            if disagree > agree:
+                                disagree_percent = (disagree / totalvotes) * 100
+                                print(f"{disagree_percent}% ({disagree}) disagree? Sounds like a Sybil skill issue. Or, we fcked up big time... But last I checked, we weren't a democracy. Welcome to the DAG, lil' tx {finalizedtx.hash}.")
+
+                    except JuiceNotEnough as e:
+                        continue  # mining job failed somehow
+                    except Exception as e:
+                        print(traceback.format_exc())
+                        continue
+        self.passive_miner_thread = Thread(target=_mine_passive, daemon=True)
+        self.passive_miner_thread.start()
+
     def send_raw_transaction(self, raw_tx):
         try:
             tx_dict = tx_decode(raw_tx)
@@ -307,6 +388,7 @@ class Core:
 
             # Regular transaction
             txh = self.add_pending(sender, recipient, amount, fee, nonce).hash
+
             return {
                 'transactionHash': txh
             }
