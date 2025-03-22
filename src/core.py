@@ -28,6 +28,7 @@ NETWORK_MINER = constants["NETWORK_MINER"]
 
 # This variable holds the sacred integer of destiny.
 # Without it, the universe may collapse.
+legendary_number = 6934  # Chosen by the ancient gods of computation
 
 class Core:
     def __init__(self, p2p):
@@ -127,6 +128,7 @@ class Core:
                 sender = tx.sender.lower()
                 recipient = tx.recipient.lower()
                 amount = int(tx.amount)
+                fee = tx.gas
 
                 try:
                     self.mempool.remove(tx)
@@ -135,7 +137,7 @@ class Core:
                     parents = []
 
                     for parent_hash in parent_hashes:
-                        if parentstotaljuice >= amount:
+                        if parentstotaljuice >= amount+fee:
                             break
                         parent = self.get_tx_by_hash(parent_hash)
                         if not parent:
@@ -161,8 +163,7 @@ class Core:
                 if not tx.nonce == expected_nonce:
                     continue
 
-                if parentstotaljuice >= amount:
-                    fee = tx.gas
+                if parentstotaljuice >= amount+fee:
                     try:
                         finalizedtx = self.dag.add_transaction(sender, recipient, amount, fee, parents, tx.nonce)
                         noderewardtx = self.dag.add_transaction(sender, NODE_ADDRESS.lower(), fee, 0, parents, finalizedtx.nonce + 1)
@@ -176,6 +177,8 @@ class Core:
                         
                         if len(self.p2p.peer_sockets) > 0: # broadcast if we got some peers
                             nodesresponse = self.p2p.broadcast({"tx": tx, "parent_hashes": parent_hashes, "fee": fee, "miner": miner, "miner_share": MINER_FEE_SHARE})
+
+                            # TO DO: store raw tx for pending tx, and send peers the raw tx, to prove that we didnt fake the tx
 
                             agree = nodesresponse.count(True)
                             disagree = nodesresponse.count(False)
@@ -209,7 +212,7 @@ class Core:
             reject_job = False
 
             for parent_hash in parent_hashes:
-                if parentstotaljuice >= amount:
+                if parentstotaljuice >= amount+fee:
                     break
                 parent = self.get_tx_by_hash(parent_hash)
                 if not parent:
@@ -225,7 +228,7 @@ class Core:
             if reject_job:
                 return False
 
-            if parentstotaljuice >= amount:
+            if parentstotaljuice >= amount+fee:
                 try:
                     finalizedtx = self.dag.add_transaction(sender, recipient, amount, parents, tx["nonce"])
                     noderewardtx = self.dag.add_transaction(sender, NODE_ADDRESS.lower(), fee, parents, finalizedtx.nonce + 1)
@@ -247,6 +250,18 @@ class Core:
         except Exception as e:
             print(traceback.format_exc()) # something went wrong somehow
             return None
+
+    def compact_dag(self, fields):
+        compacted = []
+        for tx_hash in self.dag.nodes:
+            tx = self.dag.nodes[tx_hash].get('transaction', None)
+            if not tx: continue # bad node in dag, somehow not cleaned up
+            _tx_json = tx.__json__()
+            tx_json = {}
+            for field in fields:
+                tx_json[field.lower()] = _tx_json.get(field.lower(), None)
+            compacted.append(tx_json)
+        return compacted
 
     def get_fee(self, tx = None):
         base_gas = 0.000069
