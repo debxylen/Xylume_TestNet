@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import traceback
 import logging
 import os
+from eth_abi import encode
 from flask_cors import CORS, cross_origin
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -40,6 +41,9 @@ class RPC(Flask):
             if method == 'eth_getBalance':
                 return self.handle_get_balance(data)
 
+            if method == 'eth_call':
+                return self.handle_call(data)
+
             if method == 'eth_getTransactionByHash':
                 return self.handle_get_transaction_by_hash(data)
 
@@ -47,7 +51,7 @@ class RPC(Flask):
                 return self.handle_get_transaction_by_hash(data) # same as tx by hash
 
             if method == 'eth_getCode':
-                return jsonify({'jsonrpc': '2.0', 'result': '0x', 'id': data.get('id')})
+                return self.handle_get_code(data)
 
             if method == 'eth_estimateGas':
                 return self.handle_estimate_gas(data)
@@ -109,7 +113,79 @@ class RPC(Flask):
             return jsonify({'jsonrpc': '2.0', 'result': tx, 'id': data.get('id')})
         except:
             return jsonify({'jsonrpc': '2.0', 'result': None, 'id': data.get('id')})
+        
+    def handle_call(self, data):
+        call = data.get("params", [{}])[0]
+        method_id = call.get("data", "")[:10]
+        to_address = call.get("to", "").lower()
+        user_data = call.get("data", "")[10:]
+        token = self.core.tokens.get(to_address)
 
+        if token is None:
+            return jsonify({
+                'jsonrpc': '2.0',
+                'id': data.get('id'),
+                'error': {
+                    'code': -32602,
+                    'message': "No such token found."
+                }
+            })
+
+        if method_id == "0x01ffc9a7":  # supportsInterface(bytes4)
+            interface_id = user_data[:8]
+            if interface_id in token.get("interfaces", ['36372b07']):
+                return jsonify({'jsonrpc': '2.0', 'result': "0x1", 'id': data.get('id')})
+            else:
+                return jsonify({'jsonrpc': '2.0', 'result': "0x0", 'id': data.get('id')})
+
+        elif method_id == "0x70a08231":  # balanceOf(address)
+            if len(user_data) != 64:
+                return jsonify({'jsonrpc': '2.0', 'error': 'Invalid data length', 'id': data.get('id')})
+            user_address = "0x" + user_data[-40:]
+            balance = token.get("balances", {}).get(user_address.lower(), 0)
+            padded = hex(balance)[2:].rjust(64, '0')
+            return jsonify({'jsonrpc': '2.0', 'result': "0x" + padded, 'id': data.get('id')})
+
+        elif method_id == "0x06fdde03":  # name()
+            token_name = token.get("name", "")
+            result = "0x" + encode(['string'], [token_name]).hex()
+            return jsonify({'jsonrpc': '2.0', 'result': result, 'id': data.get('id')})
+
+        elif method_id == "0x95d89b41":  # symbol()
+            symbol = token.get("symbol", "")
+            result = "0x" + encode(['string'], [symbol]).hex()
+            return jsonify({'jsonrpc': '2.0', 'result': result, 'id': data.get('id')})
+
+        elif method_id == "0x313ce567":  # decimals()
+            decimals = int(token.get("decimals", 18))
+            padded = hex(decimals)[2:].rjust(64, "0")
+            return jsonify({'jsonrpc': '2.0', 'result': "0x" + padded, 'id': data.get('id')})
+
+        elif method_id == "0x18160ddd":  # totalSupply()
+            total = token.get("balances", {})
+            supply = int(sum(total.values()))
+            return jsonify({'jsonrpc': '2.0', 'result': hex(supply), 'id': data.get('id')})
+
+        return jsonify({'jsonrpc': '2.0', 'error': 'Unknown method', 'id': data.get('id')})
+
+#        elif method == 'getCode':
+#            address = str(data.get('params')[0].get('address'))
+#            code = self.core.get_code(address)
+#            return jsonify({'jsonrpc': '2.0', 'result': code, 'id': data.get('id')})
+#        elif method == 'getStorageAt':
+#            address = str(data.get('params')[0].get('address'))
+#            position = int(data.get('params')[0].get('position'), 16)
+#            storage = self.core.get_storage(address, position)
+#            return jsonify({'jsonrpc': '2.0', 'result': hex(storage), 'id': data.get('id')})
+
+    def handle_get_code(self, data):
+        address = str(data.get('params')[0])
+        if (address.lower() in self.core.tokens) or (address.lower() in ['0x1111111111111111111111111111111111111111']):
+            # currently 0x6001600155 is used for all the tokens/contracts
+            # this is a placeholder for the actual bytecode
+            return jsonify({'jsonrpc': '2.0', 'result': '0x6001600155', 'id': data.get('id')})
+        else:
+            return jsonify({'jsonrpc': '2.0', 'result': '0x', 'id': data.get('id')})
 
     def handle_get_balance(self, data):
         address = str(data.get('params')[0])
@@ -158,8 +234,8 @@ class RPC(Flask):
 
 
     def handle_get_transaction_receipt(self, data):
-        transaction_id = data['params'][0]
-        receipt = self.core.get_transaction_receipt(transaction_id)
+        transaction_hash = data['params'][0]
+        receipt = self.core.get_transaction_receipt(transaction_hash)
         return jsonify({'jsonrpc': '2.0', 'result': receipt, 'id': data.get('id')})
 
 
