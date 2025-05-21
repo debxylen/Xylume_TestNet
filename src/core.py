@@ -514,6 +514,7 @@ class Core:
             'type': 0,
             'amount': hex(tx.amount),
             'juiceLeft': hex(tx.juice),
+            'logs': [],
         }
 
     def load_dag(self):

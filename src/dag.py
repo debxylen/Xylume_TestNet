@@ -15,7 +15,7 @@ class Transaction:
         self.timestamp = time.time_ns()
         self.gas = gas
         self.data = data
-        self.hash = blake2b(f"{self.sender}{self.recipient}{self.amount}{self.nonce}{self.gas}{self.data or '0x'}".encode(), digest_size=32).hexdigest()
+        self.hash = "0x" + blake2b(f"{self.sender}{self.recipient}{self.amount}{self.nonce}{self.gas}{self.data or '0x'}".encode(), digest_size=32).hexdigest()
 
     def __json__(self):
         return {
