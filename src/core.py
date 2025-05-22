@@ -53,6 +53,7 @@ class Core:
         self.mine_passive() # start passive mining thread
         os.system("cls" if os.name == "nt" else "clear")
         print(pyfiglet.figlet_format("Xylume TestNet", font="doom"))
+        self.ws.start()
 
     def add_pending(self, sender, recipient, amount: int, gas, nonce = None, data = '0x'):
         """Add a new transaction to the mempool."""

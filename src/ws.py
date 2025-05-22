@@ -12,6 +12,8 @@ class WSBroadcaster:
         self.clients_lock = threading.Lock()
         self.loop = asyncio.new_event_loop()
         self._server_thread = threading.Thread(target=self._start_server_loop, daemon=True)
+
+    def start(self):
         self._server_thread.start()
 
     def _start_server_loop(self):
