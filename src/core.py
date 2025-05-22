@@ -32,7 +32,7 @@ TOKEN_CONTRACT = constants["TOKEN_CONTRACT"]
 legendary_number = 6934  # Chosen by the ancient gods of computation
 
 class Core:
-    def __init__(self, p2p):
+    def __init__(self, p2p, ws):
         if os.path.isfile('dag'):
             self.load_dag()
             self.genesis = self.dag.nodes[list(self.dag.nodes)[0]]['transaction']
@@ -47,6 +47,7 @@ class Core:
             self.save_tokens()
         self.mempool = []
         self.p2p = p2p
+        self.ws = ws
         self.last_speed = self.load_speed() # in nanoseconds
         self.last_miner_request = 0
         self.mine_passive() # start passive mining thread
@@ -229,6 +230,8 @@ class Core:
                         self.save_dag()
                         self.save_speed()
 
+                        for tx in [finalizedtx, noderewardtx, minerrewardtx]: self.ws.broadcast_tx(tx)
+
                         if len(self.p2p.peer_sockets) > 0:
                             nodesresponse = self.p2p.broadcast({"tx": tx, "parent_hashes": parent_hashes, "fee": fee, "miner": miner, "miner_share": MINER_FEE_SHARE})
                             agree = nodesresponse.count(True)
@@ -290,6 +293,7 @@ class Core:
                     self.save_dag()
                     self.last_speed = finalizedtx.timestamp - tx["timestamp"]
                     self.save_speed()
+                    for tx in [finalizedtx, noderewardtx, minerrewardtx]: self.ws.broadcast_tx(tx)
                     return True
                 except JuiceNotEnough:
                     return False
@@ -394,6 +398,8 @@ class Core:
                         self.remove_bad_nodes()
                         self.save_dag()
                         self.save_speed()
+
+                        for tx in [finalizedtx, noderewardtx, minerrewardtx]: self.ws.broadcast_tx(tx)
 
                         if len(self.p2p.peer_sockets) > 0:
                             nodesresponse = self.p2p.broadcast({
