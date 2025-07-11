@@ -16,10 +16,14 @@ class WSBroadcaster:
     def start(self):
         self._server_thread.start()
 
+    async def _safe_serve(self):
+        start_server = await websockets.serve(self._handler, self.host, self.port)
+        print(f"[WebSocket] Server running at ws://{self.host}:{self.port}")
+        await start_server.wait_closed()
+
     def _start_server_loop(self):
         asyncio.set_event_loop(self.loop)
-        start_server = websockets.serve(self._handler, self.host, self.port)
-        self.loop.run_until_complete(start_server)
+        self.loop.run_until_complete(self._safe_serve())
         print(f"[WebSocket] Server running at ws://{self.host}:{self.port}")
         self.loop.run_forever()
 
