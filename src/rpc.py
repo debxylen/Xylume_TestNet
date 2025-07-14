@@ -16,6 +16,7 @@ class RPC(Flask):
         CORS(self, origins="*")
         self.limiter = Limiter(get_remote_address, app=self, storage_uri="memory://")
         self.route('/', methods=['GET', 'POST'])(self.home)
+        self.route('/rpc', methods=['POST'])(self.handle_rpc)
         self.route('/rpc/', methods=['POST'])(self.handle_rpc)
         self.route('/mining/get', methods=['GET'])(cross_origin()(self.limiter.limit("1/second")(self.get_job)))
         self.route('/mining/submit', methods=['POST'])(cross_origin()(self.limiter.limit("1/2second")(self.submit_mined)))
