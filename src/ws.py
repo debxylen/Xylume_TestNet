@@ -5,7 +5,7 @@ import threading
 import os
 
 class WSBroadcaster:
-    def __init__(self, host="0.0.0.0", port=int(os.environ.get("PORT", 3000))):
+    def __init__(self, host="0.0.0.0", port=25857):
         self.host = host
         self.port = port
         self.connected_clients = set()

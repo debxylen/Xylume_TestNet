@@ -2,7 +2,6 @@ from utils import *
 from tx_sign import *
 from tx_decode import *
 from dag import *
-import pyfiglet
 import traceback
 import pickle
 import os
@@ -13,7 +12,7 @@ from threading import Thread
 from dotenv import load_dotenv
 load_dotenv()
 
-with open("config.json", "r") as f:
+with open("./config.json", "r") as f:
     constants = json.load(f)
 
 CHAIN_ID = constants["CHAIN_ID"]
@@ -47,12 +46,11 @@ class Core:
             self.save_tokens()
         self.mempool = []
         self.p2p = p2p
+        self.p2p.process_received = self.process_received
         self.ws = ws
         self.last_speed = self.load_speed() # in nanoseconds
         self.last_miner_request = 0
         self.mine_passive() # start passive mining thread
-        os.system("cls" if os.name == "nt" else "clear")
-        print(pyfiglet.figlet_format("Xylume TestNet", font="doom"))
         self.ws.start()
 
     def add_pending(self, sender, recipient, amount: int, gas, nonce = None, data = '0x'):
@@ -112,9 +110,16 @@ class Core:
         return job
 
     def _process_contract_interaction(self, tx):
-        sender = tx.sender.lower()
-        recipient = tx.recipient.lower()
-        data = tx.data
+        if type(tx) == dict:
+            sender = tx["sender"].lower()
+            recipient = tx["recipient"].lower()
+            nonce = tx["nonce"]
+            data = tx["data"]
+        else:
+            sender = tx.sender.lower()
+            recipient = tx.recipient.lower()
+            nonce = tx.nonce
+            data = tx.data
 
         if recipient in self.tokens:
             if len(data) != 138:
@@ -138,7 +143,7 @@ class Core:
                 initial_mint_amount = int(f_params[3])
                 symbol = f_params[4]
                 name = ' '.join(f_params[5:])
-                token_address = string_to_hex_with_prefix(f'{tx.nonce}token{sender}').lower()[:42]
+                token_address = string_to_hex_with_prefix(f'{nonce}token{sender}').lower()[:42]
                 if token_address in self.tokens:
                     raise Exception('Token address collision')
                 self.tokens[token_address] = {
@@ -234,7 +239,7 @@ class Core:
                         for tx in [finalizedtx, noderewardtx, minerrewardtx]: self.ws.broadcast_tx(tx)
 
                         if len(self.p2p.peer_sockets) > 0:
-                            nodesresponse = self.p2p.broadcast({"tx": tx, "parent_hashes": parent_hashes, "fee": fee, "miner": miner, "miner_share": MINER_FEE_SHARE})
+                            nodesresponse = self.p2p.broadcast({"tx": tx.__json__(), "parent_hashes": parent_hashes, "fee": fee, "miner": miner, "miner_share": MINER_FEE_SHARE})
                             agree = nodesresponse.count(True)
                             disagree = nodesresponse.count(False)
                             totalvotes = agree + disagree
@@ -287,9 +292,9 @@ class Core:
                     if tx["data"]:
                         self._process_contract_interaction(tx)
 
-                    finalizedtx = self.dag.add_transaction(sender, recipient, amount, parents, tx["nonce"])
-                    noderewardtx = self.dag.add_transaction(sender, NODE_ADDRESS.lower(), fee, parents, finalizedtx.nonce + 1)
-                    minerrewardtx = self.dag.add_transaction(NODE_ADDRESS.lower(), miner.lower(), fee * miner_share, [noderewardtx], self.get_transaction_count(NODE_ADDRESS, "latest"))
+                    finalizedtx = self.dag.add_transaction(sender, recipient, amount, fee, parents, tx["nonce"], tx["data"])
+                    noderewardtx = self.dag.add_transaction(sender, NODE_ADDRESS.lower(), fee, 0, parents, finalizedtx.nonce + 1)
+                    minerrewardtx = self.dag.add_transaction(NODE_ADDRESS.lower(), miner.lower(), fee * miner_share, 0, [noderewardtx], self.get_transaction_count(NODE_ADDRESS, "latest"))
                     self.remove_bad_nodes()
                     self.save_dag()
                     self.last_speed = finalizedtx.timestamp - tx["timestamp"]
@@ -345,7 +350,7 @@ class Core:
         def _mine_passive():
             active = False
             while True:
-                time.sleep(0.5)  # avoid oofing cpu
+                time.sleep(0.1)  # avoid oofing cpu
                 if (time.time() - self.last_miner_request) <= 4:
                     if active:
                         print("Network Miner Deactivated.")
@@ -404,9 +409,9 @@ class Core:
 
                         if len(self.p2p.peer_sockets) > 0:
                             nodesresponse = self.p2p.broadcast({
-                                "tx": tx,
+                                "tx": finalizedtx.__json__(),
                                 "parent_hashes": [parent.hash for parent in parents],
-                                "fee": tx.gas,
+                                "fee": finalizedtx.gas,
                                 "miner": NETWORK_MINER,
                                 "miner_share": MINER_FEE_SHARE
                             })
