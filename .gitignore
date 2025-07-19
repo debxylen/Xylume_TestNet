@@ -10,3 +10,5 @@ env.bak/
 venv.bak/
 archive/
 dag
+data.json
+tokens.json
