@@ -1,0 +1,116 @@
+<h1 class="text-3xl font-bold mb-4">Core Architecture & Transaction Flow</h1>
+
+<p class="text-gray-400 mb-6">
+  Xylume TestNet uses a DAG (Directed Acyclic Graph) structure to process and validate transactions in a parallel,
+  high-performance manner. Instead of using blocks like traditional blockchains, transactions in Xylume are connected in
+  a flowing graph, where each transaction links to its parent(s), forming a scalable and efficient validation network.
+</p>
+
+<h2 class="text-2xl font-bold mt-8 mb-4">Directed Acyclic Graph (DAG)</h2>
+<p class="text-gray-400 mb-4">
+  Traditional blockchains follow a linear chain structure, where transactions are grouped into blocks and appended one
+  after another. This creates bottlenecks in performance and transaction speed. In contrast, Xylume TestNet leverages a
+  DAG model, allowing multiple transactions to be validated and added simultaneously, without waiting for block
+  production.
+</p>
+
+<p class="text-gray-400 mb-6">
+  In a DAG, each transaction points to one or more previous transactions. This parallel structure removes the dependency
+  on block intervals and increases the network's ability to scale, making it ideal for high-throughput environments.
+</p>
+
+<div class="p-4 rounded bg-primary/10 border-l-4 border-primary mb-6">
+  <div class="flex items-start space-x-3">
+    <div class="w-6 h-6 flex items-center justify-center text-primary mt-1">
+      <i class="ri-information-line"></i>
+    </div>
+    <div>
+      <h4 class="font-bold mb-2">No Forks. No Reorgs.</h4>
+      <p class="text-gray-400">
+        There’s no “longest chain” to fight over. Transactions in Xylume reference valid parents directly, making
+        classic reorgs and forks practically impossible. Nodes follow the rules — not the crowd.
+      </p>
+    </div>
+  </div>
+</div>
+
+<h2 class="text-2xl font-bold mt-8 mb-4">Parent-Child Transaction Model</h2>
+<p class="text-gray-400 mb-4">
+  Each transaction in Xylume acts as both a child and a potential parent. Child transactions reference the unspent
+  outputs of their parent transactions — a mechanism that ensures secure and traceable value transfer. This linking of
+  transactions forms a hierarchical structure within the DAG, enhancing transaction integrity by forming a series of
+  validated transactions in the graph.
+</p>
+
+<p class="text-gray-400 mb-6">
+  This parent-child model not only enables parallel processing but also helps in eliminating redundant validations. Once
+  a parent transaction is validated and part of the DAG, its children can be validated with minimal checks,
+  significantly improving propagation speed and performance across the network.
+</p>
+
+<h2 class="text-2xl font-bold mt-8 mb-4">The Juice System</h2>
+<p class="text-gray-400 mb-4">
+  The core of Xylume’s validation logic revolves around the concept of “juice.” Juice refers to the unspent output of a
+  transaction, similar to the UTXO model used in Bitcoin. A child transaction must use the juice from its parent to be
+  considered valid. This ensures a provable and secure flow of value, as every transaction can be traced back through
+  its lineage of parents.
+</p>
+
+<div class="p-4 rounded bg-red-500/10 border-l-4 border-red-500 mb-6">
+  <div class="flex items-start space-x-3">
+    <div class="w-6 h-6 flex items-center justify-center text-red-500 mt-1">
+      <i class="ri-alert-line"></i>
+    </div>
+    <div>
+      <h4 class="font-bold mb-2">No voting. No forks. Just rule-based elimination.</h4>
+      <p class="text-gray-400">
+        Each node in Xylume independently validates transactions and assumes its own logic is correct. If a transaction
+        passes validation, it is accepted — regardless of majority opinion. Honest nodes naturally align; faulty or
+        malicious ones drift out of sync and get ignored. No strict consensus mechanism is required: just rule-based
+        validation and deterministic resolution.
+      </p>
+    </div>
+  </div>
+</div>
+
+<h2 class="text-2xl font-bold mt-8 mb-4">Proof of Unspent Transaction eXploration (PoUTX)</h2>
+<p class="text-gray-400 mb-4">
+  Xylume uses Proof of Unspent Transaction eXploration (PoUTX) as its core validation and mining mechanism. Miners
+  explore the DAG to locate valid parent transactions with unspent outputs referred to as <strong>juice</strong>. They
+  then submit the parent hashes and the child transaction’s hash to a node for verification.
+</p>
+
+<p class="text-gray-400 mb-4">
+  The receiving node independently re-validates the submission by checking signatures, juice availability, and
+  correctness. Upon successful 'mining', the transaction is added to the DAG. This process ensures that no
+  double-spending occurs and that the resulting transaction graph reflects a secure, traceable flow of value.
+  As a result, the series of validated transactions naturally ensures that only valid transactions are included in the
+  DAG.
+</p>
+
+<div class="p-4 rounded bg-primary/10 border-l-4 border-primary mb-6">
+  <div class="flex items-start space-x-3">
+    <div class="w-6 h-6 flex items-center justify-center text-primary mt-1">
+      <i class="ri-information-line"></i>
+    </div>
+    <div>
+      <h4 class="font-bold mb-2">Efficiency Bonus</h4>
+      <p class="text-gray-400">Since each transaction only depends on its direct parent(s), PoUTX enables a lightweight
+        state dependency system that eliminates the need to reference global state — making validation faster, more
+        efficient, and resilient against structural attacks.</p>
+    </div>
+  </div>
+</div>
+
+<h2 class="text-2xl font-bold mt-8 mb-4">Summary</h2>
+<p class="text-gray-400 mb-4">
+  Together, the DAG structure, parent-child model, juice system, and PoUTX validation form the core of Xylume TestNet’s
+  architecture. It enables fast, parallel transaction processing, high scalability, hardware efficiency, integrity, and
+  secure value transfer — all without relying on blocks or global state.
+</p>
+
+<p class="text-gray-400">
+  While currently running as a TestNet, it reflects the intended core logic and architecture of Xylume’s eventual
+  mainnet. The system is built to support secure, performant decentralized applications, transactions and much more
+  without relying on slow, traditional blockchains or centralized design patterns.
+</p>

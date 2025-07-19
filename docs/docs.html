@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xylume TestNet Documentation</title>
+  <meta name="description"
+    content="Xylume TestNet is a next-generation UTXO DAG-based decentralized EVM-compatible network optimized for high throughput, scalability, and low-gas transactions with sub-second latency.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins&family=JetBrains+Mono&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/remixicon/4.6.0/remixicon.min.css" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/5.1.1/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+  <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown-dark.min.css" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#6E56CF',
+            secondary: '#4F46E5'
+          },
+          borderRadius: {
+            'none': '0px',
+            'sm': '4px',
+            DEFAULT: '8px',
+            'md': '12px',
+            'lg': '16px',
+            'xl': '20px',
+            '2xl': '24px',
+            '3xl': '32px',
+            'full': '9999px',
+            'button': '8px'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :where([class^="ri-"])::before {
+      content: "\f3c2";
+    }
+
+    body {
+      background: linear-gradient(135deg, #0A0A0F 0%, #1A1A2E 100%);
+      font-family: 'Poppins', sans-serif;
+    }
+
+    .glass-effect {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .code-window {
+      background: rgba(22, 27, 34, 0.8);
+      backdrop-filter: blur(10px);
+    }
+
+    .glow {
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+    }
+
+    .neon-text {
+      text-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+    }
+
+    .nav-item {
+      transition: all 0.2s ease;
+    }
+
+    .nav-item:hover {
+      background: rgba(110, 86, 207, 0.1);
+      border-left: 3px solid #6E56CF;
+      transform: translateX(2px);
+    }
+
+    .nav-item.active {
+      background: rgba(110, 86, 207, 0.2);
+      border-left: 3px solid #6E56CF;
+      color: #6E56CF;
+    }
+
+    .content-section {
+      animation: fadeInUp 0.6s ease-out;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .search-input {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.3s ease;
+    }
+
+    .search-input:focus {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: #6E56CF;
+      box-shadow: 0 0 0 3px rgba(110, 86, 207, 0.1);
+    }
+
+    .gradient-text {
+      background: linear-gradient(135deg, #6E56CF 0%, #4F46E5 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .sidebar-toggle {
+      display: none;
+    }
+
+    @media (max-width: 1024px) {
+      .sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      .sidebar-toggle {
+        display: block;
+      }
+
+      .main-content {
+        margin-left: 0;
+      }
+    }
+
+    .copy-button {
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .code-window:hover .copy-button {
+      opacity: 1;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+  <div class="flex h-screen overflow-hidden">
+    <!-- Sidebar -->
+    <div class="sidebar fixed left-0 top-0 h-full w-3/5 lg:w-1/5 bg-gray-900 border-r border-gray-800 z-50">
+      <div class="flex flex-col h-full">
+        <!-- Logo -->
+        <div class="p-6 border-b border-gray-800">
+          <div class="flex items-center">
+            <div class="w-16 h-16 rounded-lg flex items-center justify-center">
+              <img src="xylume_transparent.png">
+            </div>
+            <div>
+              <h1 class="text-xl font-bold gradient-text">Xylume TestNet</h1>
+              <p class="text-sm text-gray-400">Documentation</p>
+            </div>
+          </div>
+        </div>
+        <!-- Search -->
+        <div class="p-4">
+          <div class="relative">
+            <div
+              class="w-6 h-6 flex items-center justify-center absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+              <i class="ri-search-line"></i>
+            </div>
+            <input type="text" placeholder="Search documentation..."
+              class="search-input w-full pl-10 pr-4 py-2 rounded text-gray-100 placeholder-gray-400 outline-none">
+          </div>
+        </div>
+        <!-- Navigation -->
+        <nav class="flex-1 overflow-y-auto px-4 pb-4">
+          <div class="space-y-1">
+            <div class="nav-item px-3 py-2 rounded cursor-pointer active" data-page="intro.html">
+              <div class="flex items-center space-x-3">
+                <div class="w-5 h-5 flex items-center justify-center">
+                  <i class="ri-home-line text-sm"></i>
+                </div>
+                <span class="font-medium">Getting Started</span>
+              </div>
+            </div>
+            <div class="nav-item px-3 py-2 rounded cursor-pointer" data-page="architecture.html">
+              <div class="flex items-center space-x-3">
+                <div class="w-5 h-5 flex items-center justify-center">
+                  <i class="ri-stack-line text-sm"></i>
+                </div>
+                <span class="font-medium">Architecture</span>
+              </div>
+            </div>
+            <div class="nav-item px-3 py-2 rounded cursor-pointer" data-page="network.html">
+              <div class="flex items-center space-x-3">
+                <div class="w-5 h-5 flex items-center justify-center">
+                  <i class="ri-wifi-line text-sm"></i>
+                </div>
+                <span class="font-medium">Network Architecture</span>
+              </div>
+            </div>
+            <div class="nav-item px-3 py-2 rounded cursor-pointer" data-page="security.html">
+              <div class="flex items-center space-x-3">
+                <div class="w-5 h-5 flex items-center justify-center">
+                  <i class="ri-shield-check-line text-sm"></i>
+                </div>
+                <span class="font-medium">Security & Integrity</span>
+              </div>
+            </div>
+            <div class="nav-item px-3 py-2 rounded cursor-pointer" data-page="tokenomics.html">
+              <div class="flex items-center space-x-3">
+                <div class="w-5 h-5 flex items-center justify-center">
+                  <i class="ri-coin-line text-sm"></i>
+                </div>
+                <span class="font-medium">Tokenomics</span>
+              </div>
+            </div>
+            <div class="nav-item px-3 py-2 rounded cursor-pointer" data-page="faq.html">
+              <div class="flex items-center space-x-3">
+                <div class="w-5 h-5 flex items-center justify-center">
+                  <i class="ri-question-line text-sm"></i>
+                </div>
+                <span class="font-medium">FAQ</span>
+              </div>
+            </div>
+          </div>
+        </nav>
+        <!-- Footer -->
+        <div class="p-4 border-t border-gray-800">
+          <div class="flex items-center justify-between text-xs text-gray-400">
+            <span>v1.0.0</span>
+            <div class="flex space-x-3">
+              <a href="https://debxylen.github.io/Xylume_TestNet/" target="_blank">
+                <div class="w-4 h-4 flex hover:text-primary items-center justify-center animate-all">
+                  <i class="ri-home-line"></i>
+                </div>
+              </a>
+              <a href="https://github.com/debxylen/Xylume_TestNet/" target="_blank">
+                <div class="w-4 h-4 flex hover:text-primary items-center justify-center animate-all">
+                  <i class="ri-github-line"></i>
+                </div>
+              </a>
+              <a href="https://discord.gg/csDr2zwyd9" target="_blank">
+                <div class="w-4 h-4 flex items-center hover:text-primary justify-center animate-all">
+                  <i class="ri-discord-line"></i>
+                </div>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Mobile Toggle -->
+    <button class="sidebar-toggle fixed top-4 left-4 z-50 p-2 bg-gray-800 rounded-lg border border-gray-700">
+      <div class="w-5 h-5 flex items-center justify-center">
+        <i class="ri-menu-line text-gray-300"></i>
+      </div>
+    </button>
+    <!-- Main Content -->
+    <div class="main-content flex-1 ml-auto lg:ml-72 overflow-y-auto">
+      <div class="max-w-6xl mx-auto p-8">
+        <!-- Breadcrumb -->
+        <nav class="mb-8">
+          <div class="flex items-center space-x-2 text-sm text-gray-400">
+            <span>Documentation</span>
+            <div class="w-4 h-4 flex items-center justify-center">
+              <i class="ri-arrow-right-s-line"></i>
+            </div>
+            <span id="breadcrumb-current" class="text-primary">Getting Started</span>
+          </div>
+        </nav>
+        <!-- Content -->
+        <div id="content" class="content-section prose prose-invert max-w-none bg-blue-800/0">
+          <!-- Default content will be loaded here -->
+        </div>
+      </div>
+    </div>
+  </div>
+  <script id="navigation-handler">
+    document.addEventListener('DOMContentLoaded', function () {
+      const navItems = document.querySelectorAll('.nav-item');
+      const content = document.getElementById('content');
+      const breadcrumbCurrent = document.getElementById('breadcrumb-current');
+
+      function loadPage(name) {
+        fetch('./pages/' + name)
+          .then(res => res.text())
+          .then(contentData => {
+            // detect if it's .md
+            if (name.endsWith('.md')) {
+              content.innerHTML = marked.parse(contentData);
+            } else {
+              content.innerHTML = contentData;
+            }
+
+            // Update breadcrumb
+            const activeNav = document.querySelector(`.nav-item[data-page="${name}"]`);
+            if (activeNav) {
+              breadcrumbCurrent.textContent = activeNav.querySelector('span').textContent;
+            }
+
+            // Highlight code blocks
+            document.querySelectorAll('pre code').forEach((block) => {
+              Prism.highlightElement(block);
+            });
+          })
+          .catch(error => {
+            console.error('Error loading page:', error);
+            content.innerHTML = '<div class="text-red-500">Error loading content</div>';
+          });
+      }
+
+      // Navigation click handlers
+      navItems.forEach(item => {
+        item.addEventListener('click', () => {
+          navItems.forEach(nav => nav.classList.remove('active'));
+          item.classList.add('active');
+          loadPage(item.dataset.page);
+          history.pushState(null, '', `#${item.dataset.page}`);
+        });
+      });
+
+      window.addEventListener('popstate', () => {
+        const page = window.location.hash?.substring(1) || 'intro.html';
+        navItems.forEach(nav => { if (nav.dataset.page == page) { nav.classList.add('active'); } else { nav.classList.remove('active'); } });
+        loadPage(page);
+      });
+
+      // Load initial content
+      const initialPage = window.location.hash?.substring(1) || 'intro.html';
+      navItems.forEach(nav => { if (nav.dataset.page == initialPage) { nav.classList.add('active'); } else { nav.classList.remove('active'); } });
+      loadPage(initialPage);
+    });
+  </script>
+  <script id="mobile-navigation">
+    document.addEventListener('DOMContentLoaded', function () {
+      const sidebarToggle = document.querySelector('.sidebar-toggle');
+      const sidebar = document.querySelector('.sidebar');
+      sidebarToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('open');
+      });
+      // Close sidebar when clicking outside on mobile
+      document.addEventListener('click', (e) => {
+        if (window.innerWidth <= 1024 &&
+          !sidebar.contains(e.target) &&
+          !sidebarToggle.contains(e.target)) {
+          sidebar.classList.remove('open');
+        }
+      });
+    });
+  </script>
+  <script id="search-functionality">
+    document.addEventListener('DOMContentLoaded', function () {
+      const searchInput = document.querySelector('.search-input');
+      const navItems = document.querySelectorAll('.nav-item');
+      searchInput.addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        navItems.forEach(item => {
+          const text = item.textContent.toLowerCase();
+          if (text.includes(searchTerm)) {
+            item.style.display = 'block';
+          } else {
+            item.style.display = searchTerm ? 'none' : 'block';
+          }
+        });
+      });
+    });
+  </script>
+  <script>
+    function copyCode(el) {
+      const code = el.parentElement.parentElement.querySelector('pre').innerText;
+      navigator.clipboard.writeText(code);
+      const button = document.querySelector('.ri-clipboard-line');
+      button.className = 'ri-check-line';
+      setTimeout(() => {
+        button.className = 'ri-clipboard-line';
+      }, 2000);
+    }
+  </script>
+  <script src="smoothscroll.js"></script>
+</body>
+
+</html>

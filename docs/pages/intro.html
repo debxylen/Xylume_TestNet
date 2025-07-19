@@ -1,0 +1,149 @@
+<h1 class="text-3xl font-bold mb-4">Welcome to Xylume TestNet</h1>
+<p class="text-gray-400 mb-4">
+  Xylume TestNet is a next-generation UTXO DAG-based decentralized EVM-compatible network, optimized for high
+  throughput, scalability, performance, low-gas transactions with sub-second latency and efficiency; built to
+  simulate the core operations of Xylume’s future mainnet.
+</p>
+
+<p class="text-gray-400 mb-6">
+  The testnet integrates advanced DAG technology, PoUTX-based validation,
+  dynamic gas model, and a parent-child transaction flow with a ‘juice’ system
+  to maximize security, speed, efficiency, and reliability. <br>
+  Unlike traditional blockchain
+  systems, Xylume TestNet offers an innovative, stable, and high-throughput
+  environment for developers to test the ecosystem safely and without financial risk,
+  using free test tokens obtained through dedicated faucets.
+</p>
+
+
+<h2 class="text-2xl font-bold mt-8 mb-4">Key Features</h2>
+<ul class="list-disc list-inside text-gray-400 space-y-2">
+  <li>DAG-based parallel transaction validation — no blocks, no bottlenecks</li>
+  <li>UTXO-style logic with PoUTX (Proof of Unspent Transaction eXploration)</li>
+  <li>Dynamic gas pricing system inspired by EIP-1559</li>
+  <li>Sub-second transaction latency and minimal gas fees</li>
+  <li>Full EVM compatibility</li>
+  <li>High resistance to attacks</li>
+</ul>
+
+<h2 class="text-2xl font-bold mt-8 mb-4">Quick Start</h2>
+
+<h3 class="text-xl font-semibold mb-2">1. Connect to the Network</h3>
+<p class="text-gray-400 mb-4">You can connect using any EVM wallet (like MetaMask) or directly in code using JSON-RPC:
+</p>
+
+<div class="code-window rounded glow mb-6">
+  <div class="flex items-center justify-between p-2 border-b border-gray-800">
+    <div class="flex items-center space-x-2">
+      <span class="text-gray-300 text-sm">javascript</span>
+    </div>
+    <button class="text-gray-400 hover:text-primary transition-colors" onclick="copyCode(this)">
+      <div class="w-5 h-5 flex items-center justify-center">
+        <i class="ri-clipboard-line"></i>
+      </div>
+    </button>
+  </div>
+  <pre
+    class="p-4 text-sm overflow-x-auto"><code>const provider = new ethers.providers.JsonRpcProvider("https://xylume-testnet.sparked.network/rpc/");</code></pre>
+</div>
+<div class="code-window rounded glow mb-6">
+  <div class="flex items-center justify-between p-2 border-b border-gray-800">
+    <div class="flex items-center space-x-2">
+      <span class="text-gray-300 text-sm">python</span>
+    </div>
+    <button class="text-gray-400 hover:text-primary transition-colors" onclick="copyCode(this)">
+      <div class="w-5 h-5 flex items-center justify-center">
+        <i class="ri-clipboard-line"></i>
+      </div>
+    </button>
+  </div>
+  <pre class="p-4 text-sm overflow-x-auto"><code>from web3 import Web3
+
+w3 = Web3(Web3.HTTPProvider("https://xylume-testnet.sparked.network/rpc/"))
+
+print(w3.is_connected())</code></pre>
+</div>
+
+<h3 class="text-xl font-semibold mt-6 mb-2">2. Get Test Tokens</h3>
+<p class="text-gray-400 mb-4">Visit the faucet and claim free test tokens.</p>
+<div class="p-4 rounded bg-primary/10 border-l-4 border-primary">
+  <div class="flex items-start space-x-3">
+    <div class="w-6 h-6 flex items-center justify-center text-primary mt-1">
+      <i class="ri-information-line"></i>
+    </div>
+    <div>
+      <h4 class="font-bold mb-2">Faucet</h4>
+      <p class="text-gray-400">Head over to <a href="https://debxylen.github.io/Xylume_TestNet/faucet.html"
+          target="_blank" class="underline text-primary">the faucet</a> to get testnet XYL tokens.</p>
+    </div>
+  </div>
+</div>
+
+<h3 class="text-xl font-semibold mt-6 mb-2">3. Try Stuff</h3>
+<ul class="list-disc list-inside text-gray-400 space-y-2">
+  <li>Send transactions</li>
+  <li>Deploy tokens</li>
+  <li>Mess around with smart contracts</li>
+  <li><a href="https://github.com/debxylen/XylumeMiner" target="_blank" class="underline text-primary">Mine</a> your own
+    transactions</li>
+  <li>Break things (just not your keyboard)</li>
+</ul>
+
+<h2 class="text-2xl font-bold mt-10 mb-4">Network Information</h2>
+<table class="w-full text-left text-gray-400 mb-6 divide-y divide-gray-800">
+  <thead>
+    <tr class="text-gray-300">
+      <th class="py-2 pr-4">Key</th>
+      <th class="py-2">Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="py-1 pr-4">Chain ID</td>
+      <td>6934</td>
+    </tr>
+    <tr>
+      <td class="py-1 pr-4">Symbol</td>
+      <td>XYL</td>
+    </tr>
+    <tr>
+      <td class="py-1 pr-4">RPC URL</td>
+      <td>https://xylume-testnet.sparked.network/rpc/</td>
+    </tr>
+    <tr>
+      <td class="py-1 pr-4">Explorer</td>
+      <td>https://debxylen.github.io/XylumeExplorer/</td>
+    </tr>
+    <tr>
+      <td class="py-1 pr-4">Websocket</td>
+      <td>wss://xylume-testnet-ws.sparked.network/</td>
+    </tr>
+    <tr>
+      <td class="py-1 pr-4">Decimals</td>
+      <td>18</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 class="text-2xl font-bold mt-10 mb-4">What's Next?</h2>
+<div class="grid grid-cols-2 gap-6">
+  <a href="#architecture.html">
+    <div
+      class="p-6 rounded bg-[#161B22] border border-gray-800 hover:border-primary/50 transition-all duration-200 cursor-pointer">
+      <div class="w-8 h-8 flex items-center justify-center text-primary mb-4">
+        <i class="ri-layout-masonry-line ri-2x"></i>
+      </div>
+      <h3 class="text-xl font-bold mb-2">Explore the Architecture</h3>
+      <p class="text-gray-400">Learn how the DAG structure and PoUTX validation keep Xylume fast and secure.</p>
+    </div>
+  </a>
+  <a href="#tokenomics.html">
+    <div
+      class="p-6 rounded bg-[#161B22] border border-gray-800 hover:border-primary/50 transition-all duration-200 cursor-pointer">
+      <div class="w-8 h-8 flex items-center justify-center text-primary mb-4">
+        <i class="ri-pie-chart-2-line ri-2x"></i>
+      </div>
+      <h3 class="text-xl font-bold mb-2">Understand Tokenomics</h3>
+      <p class="text-gray-400">Dive into how the native XYL token and dynamic gas model shape the TestNet economy.</p>
+    </div>
+</div>

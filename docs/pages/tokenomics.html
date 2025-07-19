@@ -1,0 +1,87 @@
+<h2 class="text-2xl font-bold mb-4">Tokenomics & Gas</h2>
+
+<p class="text-gray-400 mb-4">
+  Xylume TestNet uses a dynamic gas model designed to reward active nodes and miners fairly, while also preventing spam
+  and overuse of network resources. Every transaction consumes gas, paid in the native Xylume (<strong>XYL</strong>)
+  token.
+</p>
+
+<div class="p-4 rounded bg-primary/10 border-l-4 border-primary mb-6">
+  <div class="flex items-start space-x-3">
+    <div class="w-6 h-6 flex items-center justify-center text-primary mt-1">
+      <i class="ri-information-line"></i>
+    </div>
+    <div>
+      <h4 class="font-bold mb-2">Dynamic Gas Fees</h4>
+      <p class="text-gray-400">
+        Xylume's base gas fee increases with network load — adapting to demand to maintain performance and discourage
+        spam.
+      </p>
+    </div>
+  </div>
+</div>
+
+<h3 class="text-xl font-bold mb-2">Gas Calculation</h3>
+<p class="text-gray-400 mb-4">
+  The base gas cost is dynamically adjusted based on the current incoming transaction rate:
+</p>
+
+<div class="code-window rounded glow mb-6">
+  <div class="flex items-center justify-between p-2 border-b border-gray-800">
+    <div class="flex items-center space-x-2">
+      <span class="text-gray-300 text-sm">formula</span>
+    </div>
+    <button class="text-gray-400 hover:text-primary transition-colors" onclick="copyCode(this)">
+      <div class="w-5 h-5 flex items-center justify-center">
+        <i class="ri-clipboard-line"></i>
+      </div>
+    </button>
+  </div>
+  <pre class="p-4 text-sm overflow-x-auto"><code>BaseFee = 0.000069 + (0.000069 * (IncomingTPS / 10000))</code></pre>
+</div>
+
+<h3 class="text-xl font-bold mb-2">Incoming TPS</h3>
+<p class="text-gray-400 mb-4">
+  Incoming transactions per second (TPS) is derived from the number of pending transactions in the mempool and their
+  timestamps:
+</p>
+
+<div class="code-window rounded glow mb-6">
+  <div class="flex items-center justify-between p-2 border-b border-gray-800">
+    <div class="flex items-center space-x-2">
+      <span class="text-gray-300 text-sm">formula</span>
+    </div>
+    <button class="text-gray-400 hover:text-primary transition-colors" onclick="copyCode(this)">
+      <div class="w-5 h-5 flex items-center justify-center">
+        <i class="ri-clipboard-line"></i>
+      </div>
+    </button>
+  </div>
+  <pre
+    class="p-4 text-sm overflow-x-auto"><code>IncomingTPS = PendingTxCount / (LatestTxTimestamp - OldestTxTimestamp)</code></pre>
+</div>
+
+<h3 class="text-xl font-bold mb-2">Token Supply</h3>
+<p class="text-gray-400 mb-4">
+  The initial supply of the native <strong>XYL</strong> token is <strong>6,942,340</strong> XYL. It uses 18 decimal
+  places, with the smallest unit called <code>wxei</code>, equivalent to <code>1e-18 XYL</code>, similar to Ether’s
+  smallest unit 'wei'.
+</p>
+
+<div class="p-4 rounded bg-red-500/10 border-l-4 border-red-500 mb-6">
+  <div class="flex items-start space-x-3">
+    <div class="w-6 h-6 flex items-center justify-center text-red-500 mt-1">
+      <i class="ri-alert-line"></i>
+    </div>
+    <div>
+      <h4 class="font-bold mb-2">Note</h4>
+      <p class="text-gray-400">Tokenomics on the TestNet are experimental and non-monetary. Token supply, fees, and
+        reward rates may change prior to mainnet.</p>
+    </div>
+  </div>
+</div>
+
+<p class="text-gray-400">
+  The dynamic gas mechanism also deters spam attacks by making frequent or large transaction batches more costly — while
+  keeping regular usage cheap. It's a balance between flexibility, fairness, and performance.
+</p>

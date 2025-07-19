@@ -1,0 +1,59 @@
+<h2 class="text-2xl font-bold mb-4">Security & Integrity</h2>
+
+<p class="text-gray-400 mb-4">
+  Xylume TestNet is built with security and data integrity at its core. It uses robust cryptographic systems, structural
+  transaction validation, and decentralized enforcement to ensure that every transaction is legitimate, verifiable, and
+  tamper-proof — all without relying on traditional consensus algorithms.
+</p>
+
+<h3 class="text-xl font-bold mb-2">Cryptographic Security</h3>
+<p class="text-gray-400 mb-4">
+  Every transaction on Xylume is digitally signed using the sender’s private key, guaranteeing authenticity and
+  non-repudiation. PoUTX ensures no double-spending can occur by requiring proof of unspent outputs ("juice") before any
+  new transaction is accepted.
+</p>
+<p class="text-gray-400 mb-6">
+  To further enhance speed and efficiency, Xylume uses <code>BLAKE2b</code> as its primary hashing algorithm — offering
+  strong cryptographic guarantees and outperforming traditional hashes like SHA-256 in terms of performance and
+  computational cost.
+</p>
+
+<div class="p-4 rounded bg-primary/10 border-l-4 border-primary mb-6">
+  <div class="flex items-start space-x-3">
+    <div class="w-6 h-6 flex items-center justify-center text-primary mt-1">
+      <i class="ri-information-line"></i>
+    </div>
+    <div>
+      <h4 class="font-bold mb-2">Why BLAKE2b?</h4>
+      <p class="text-gray-400">
+        BLAKE2b is faster than SHA-2, more secure than MD5, and uses less power — making it ideal for high-throughput
+        systems like Xylume.
+      </p>
+    </div>
+  </div>
+</div>
+
+<h3 class="text-xl font-bold mb-2">Resistance to Attacks</h3>
+<p class="text-gray-400 mb-4">
+  Xylume TestNet is inherently resistant to common blockchain attack vectors like 51% attacks, Sybil attacks, and
+  double-spending. The core architecture makes these exploits ineffective by design.
+</p>
+
+<ul class="list-disc list-inside text-gray-400 space-y-2 mb-6">
+  <li><strong>DAG-Based Structure</strong> — With no chain or longest-chain rule, there's nothing to reorganize.
+    Transactions validate past states, not a sequential block list.</li>
+  <li><strong>Parent-Child Validation</strong> — Invalid transactions will not be referenced by honest nodes, preventing
+    malicious forks or conflicting transactions from being accepted.</li>
+  <li><strong>Juice Rule</strong> — Prevents double-spending by enforcing a strict unspent output requirement. If juice
+    is already consumed, the transaction fails.</li>
+  <li><strong>Dynamic Gas Model</strong> — Inspired by EIP-1559, the gas fee scales with network usage, disincentivizing
+    spam or denial-of-service attempts.</li>
+  <li><strong>Peer Skepticism</strong> — Nodes rely on verified transaction history. A peer must reference valid prior
+    transactions in the DAG to get a transaction accepted across other nodes in the network, making Xylume fundamentally
+    immune to Sybil-based consensus manipulation.</li>
+</ul>
+
+<p class="text-gray-400">
+  These combined strategies allow Xylume to deliver uncompromising transactional integrity, powerful spam resistance,
+  and robust defense against malicious actors — even under high network load or adversarial conditions.
+</p>

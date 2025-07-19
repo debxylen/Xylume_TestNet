@@ -1,0 +1,64 @@
+<h1 class="text-3xl font-bold mb-4">Network Architecture</h2>
+
+  <p class="text-gray-400 mb-4">
+    Xylume TestNet uses a decentralized peer-to-peer (P2P) architecture where nodes communicate via socket-based
+    connections. Every node operates both as a sender and a receiver — maintaining open threads for bidirectional
+    communication with its peers. There is no centralized coordinator or leader; all nodes function autonomously,
+    forming a dynamic mesh across the network.
+  </p>
+
+  <p class="text-gray-400 mb-4">
+    New nodes discover and connect to the network using an automatically maintained list of healthy nodes <b>[WIP]</b>.
+    This ensures they only interact with responsive, well-performing peers — avoiding downtime or lag from faulty nodes.
+    The decentralized structure is preserved, but the quality of connectivity is optimized.
+  </p>
+
+  <div class="p-4 rounded bg-primary/10 border-l-4 border-primary mb-6">
+    <div class="flex items-start space-x-3">
+      <div class="w-6 h-6 flex items-center justify-center text-primary mt-1">
+        <i class="ri-information-line"></i>
+      </div>
+      <div>
+        <h4 class="font-bold mb-2">Node List (Work-in-Progress)</h4>
+        <p class="text-gray-400">
+          A curated list of healthy nodes is planned to simplify peer discovery. In the future, new nodes will connect
+          to all active peers from this list and self-register for visibility. Until then, node connectivity will
+          require manual configuration and connecting to known peers.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <p class="text-gray-400 mb-4">
+    Once connected, nodes receive mined transactions via broadcasts. Each node revalidates the transaction
+    independently, checking the juice availability and transaction structure. If the transaction is valid, it is added
+    to the node’s local DAG. The sender adds it regardless of peer feedback — ensuring self-validation remains the
+    ultimate authority.
+  </p>
+
+  <div class="p-4 rounded bg-red-500/10 border-l-4 border-red-500 mb-6">
+    <div class="flex items-start space-x-3">
+      <div class="w-6 h-6 flex items-center justify-center text-red-500 mt-1">
+        <i class="ri-alert-line"></i>
+      </div>
+      <div>
+        <h4 class="font-bold mb-2">No Forced Consensus</h4>
+        <p class="text-gray-400">
+          A node does not follow the majority. If a node's validation logic accepts a transaction, it adds it to its DAG
+          — even if every peer disagrees. This protects against Sybil attacks and centralization by rejecting social
+          consensus in favor of protocol logic.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <p class="text-gray-400 mb-4">
+    While this may lead to temporary desynchronization with other nodes, the design assumes that honest nodes using the
+    correct validation logic will naturally converge over time. Malicious or modified nodes will eventually fall out of
+    sync and be ignored.
+  </p>
+
+  <p class="text-gray-400">
+    There is no voting, no leader election, and no majority rule. The network remains secure, decentralized, and
+    scalable — driven by autonomous validation and trustless peer communication.
+  </p>
