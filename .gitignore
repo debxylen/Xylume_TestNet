@@ -9,6 +9,6 @@ ENV/
 env.bak/
 venv.bak/
 archive/
-dag
-data.json
-tokens.json
+src/dag
+src/data.json
+src/tokens.json
