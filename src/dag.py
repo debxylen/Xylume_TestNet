@@ -26,7 +26,7 @@ class Transaction:
             "juice": self.juice,
             "parents": [parent.hash for parent in self.parents],
             "nonce": self.nonce,
-            "timestamp": (self.timestamp/1000)/1000, # ns to s
+            "timestamp": self.timestamp / 1_000_000_000, # ns to s
             "gas": self.gas,
             "data": self.data,
         }
@@ -69,7 +69,7 @@ class DAG(nx.DiGraph):
             "hash": tx.hash,
             "number": str(hex(list(self.nodes).index(tx.hash))),
             "nonce": str(hex(tx.nonce if tx.nonce else 0)),
-            "timestamp": (tx.timestamp/1000)/1000, #ns to s
+            "timestamp": tx.timestamp / 1_000_000_000, #ns to s
             "transactions": [tx.hash],
             "gasUsed": tx.gas,
             "gasLimit": tx.gas,
