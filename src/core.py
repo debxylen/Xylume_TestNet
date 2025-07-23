@@ -68,15 +68,21 @@ class Core:
             if not self.dag.nodes[i].get('transaction'):
                 self.dag.remove_node(i)
 
-    def get_balance(self, address):
+    def get_balance(self, address, mode = 'latest'):
         address = address.lower()
-        balance = 0
-        for i in self.dag.nodes:
-            node = self.dag.nodes[i].get('transaction')
-            if not node: continue
-            if address.lower() == node.sender: balance -= node.amount
-            if address.lower() == node.recipient: balance += node.amount
-        return balance
+        confirmed_balance = sum(
+            tx.juice for node in self.dag.nodes.values()
+            if (tx := node.get("transaction"))
+            and tx.recipient == address
+            and tx.juice > 0
+        )
+        if mode == 'latest': return confirmed_balance
+
+        mempool_balance = (
+            sum(tx.amount for tx in self.mempool if tx.recipient == address)
+            - sum(tx.amount + tx.gas for tx in self.mempool if tx.sender == address)
+        )
+        return confirmed_balance + mempool_balance
 
     def get_transaction_count(self, sender_address, mode = 'latest'):
         """Counts the number of transactions in the DAG with a specific sender address."""
@@ -105,8 +111,8 @@ class Core:
         self.last_miner_request = time.time()
         if len(self.mempool) == 0:
             return 'NO_JOB'
-        transactions_to_mine = self.mempool[:1] # 1 tx max per job
-        job = {"transactions": [pendingtx.__json__() for pendingtx in transactions_to_mine]}
+        transaction_to_mine = self.mempool[0] # 1 tx max per job
+        job = {"transactions": [transaction_to_mine.__json__()]}
         return job
 
     def _process_contract_interaction(self, tx):
@@ -460,7 +466,7 @@ class Core:
             if (tx_dict['gas'] < fee) or (tx_dict['gasPrice'] != 1):
                 return {'error': f'Invalid gas values provided. Gas units required: {fee}, Gas Price: 1 wei'}
 
-            if self.get_balance(sender) < amount + fee:
+            if self.get_balance(sender, 'pending') < amount + fee:
                 return {'error': f"Not enough balance."}
 
             to_replace = self.find_pending(sender, nonce)
