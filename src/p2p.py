@@ -76,7 +76,7 @@ class P2PNode:
         self.server_socket.listen(5)
         print(f"Listening on {self.listen_ip}:{self.listen_port}...")
 
-        threading.Thread(target=self.connect_to_peer, args=("212.192.28.4", 25795), daemon=True).start()
+        #threading.Thread(target=self.connect_to_peer, args=("212.192.28.4", 25795), daemon=True).start()
 
         while True:
             client_socket, addr = self.server_socket.accept()

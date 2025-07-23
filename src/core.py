@@ -115,6 +115,27 @@ class Core:
         job = {"transactions": [transaction_to_mine.__json__()]}
         return job
 
+    def retry_picked_loop(self):
+        def _retry():
+            while True:
+                time.sleep(0.5)
+                now = time.time()
+                expired = []
+
+                for txh, meta in list(self.picked.items()):
+                    if now - meta["timestamp"] >= 2:  # timeout in seconds
+                        expired.append(txh)
+
+                for txh in expired:
+                    try:
+                        self.mempool.append(self.picked[txh]["tx"])
+                    except Exception as e:
+                        print(f"Error re-adding tx {txh}: {e}")
+                    del self.picked[txh]
+                    print(f"⏱️ Re-added expired tx {txh} back to mempool.")
+
+        Thread(target=_retry, daemon=True).start()
+
     def _process_contract_interaction(self, tx):
         if type(tx) == dict:
             sender = tx["sender"].lower()
@@ -170,155 +191,182 @@ class Core:
                 self.tokens[token_address]["balances"][mint_address] = self.tokens[token_address]["balances"].get(mint_address, 0) + mint_amount
                 self.save_tokens()
 
-    def submit_mined(self, mined_txs: dict, miner):
-        try:
-            txs = []
-            for tx_hash, parent_hashes in mined_txs.items():
-                mined_txs[tx_hash] = set(parent_hashes)
-                tx = next((tx for tx in self.mempool if tx.hash == tx_hash), None)
-                if not tx:
-                    return False, f"Error: Transaction {tx_hash} not found in mempool."
-                if not mined_txs[tx_hash].issubset(self.dag.nodes):
-                    return False, f"Error: A parent transaction was not found in DAG."
-                txs.append(tx)
+    def find_valid_parents(self, tx, parent_hashes=None):
+        juice_needed = int(tx.amount + tx.gas)
+        parentstotaljuice = 0
+        parents = []
 
-            txs.sort(key=lambda tx: [tx.hash for tx in self.mempool].index(tx.hash))
-
-            noderewardtxs = []
-            minerrewardtxs = []
-            for tx in txs:
-                reject_job = False
-                parent_hashes = mined_txs[tx.hash]
-                sender = tx.sender.lower()
-                recipient = tx.recipient.lower()
-                amount = int(tx.amount)
-                fee = tx.gas
-
-                try:
-                    self.mempool.remove(tx)
-                    parentstotaljuice = 0
-                    parents = []
-
-                    for parent_hash in parent_hashes:
-                        if parentstotaljuice >= amount + fee:
-                            break
-                        parent = self.get_tx_by_hash(parent_hash)
-                        if not parent or parent.recipient.lower() != sender or parent.juice <= 0:
-                            reject_job = True
-                            break
-                        parents.append(parent)
-                        parentstotaljuice += parent.juice
-
-                    if reject_job:
-                        raise RejectJob('Rejected Job.')
-
-                except ValueError:
-                    continue
-                except RejectJob:
-                    continue
-
-                expected_nonce = self.get_transaction_count(sender, "latest")
-                if not tx.nonce == expected_nonce:
-                    continue
-
-                if parentstotaljuice >= amount + fee:
-                    try:
-                        # Execute contract logic
-                        if tx.data and (tx.data != '0x'):
-                            try:
-                                self._process_contract_interaction(tx)
-                            except Exception as e:
-                                print(f"Contract execution failed during mining: {e}")
-                                continue  # skip tx
-
-                        finalizedtx = self.dag.add_transaction(sender, recipient, amount, fee, parents, tx.nonce, tx.data)
-                        noderewardtx = self.dag.add_transaction(sender, NODE_ADDRESS.lower(), fee, 0, parents, finalizedtx.nonce + 1)
-                        noderewardtxs.append(noderewardtx)
-                        minerrewardtx = self.dag.add_transaction(NODE_ADDRESS.lower(), miner.lower(), fee * MINER_FEE_SHARE, 0, [noderewardtx], self.get_transaction_count(NODE_ADDRESS, "latest"))
-                        minerrewardtxs.append(minerrewardtx)
-
-                        self.last_speed = finalizedtx.timestamp - tx.timestamp
-                        self.remove_bad_nodes()
-                        self.save_dag()
-                        self.save_speed()
-
-                        for tx in [finalizedtx, noderewardtx, minerrewardtx]: self.ws.broadcast_tx(tx)
-
-                        if len(self.p2p.peer_sockets) > 0:
-                            nodesresponse = self.p2p.broadcast({"tx": tx.__json__(), "parent_hashes": parent_hashes, "fee": fee, "miner": miner, "miner_share": MINER_FEE_SHARE})
-                            agree = nodesresponse.count(True)
-                            disagree = nodesresponse.count(False)
-                            totalvotes = agree + disagree
-                            if disagree > agree:
-                                disagree_percent = (disagree / totalvotes) * 100
-                                print(f"{disagree_percent}% ({disagree}) disagree? Sounds like a Sybil skill issue. Or, we fcked up big time... But last I checked, we weren't a democracy. Welcome to the DAG, lil' tx {finalizedtx.hash}.")
-
-                    except JuiceNotEnough:
-                        continue
-                    except Exception:
-                        print(traceback.format_exc())
-                        continue
-
-            return True, minerrewardtxs
-        except Exception:
-            print(traceback.format_exc())
-            return False, str(e)
-
-    def process_received(self, data):  # process validated txs received from other nodes
-        try:
-            tx, parent_hashes, fee, miner, miner_share = data["tx"], data["parent_hashes"], data["fee"], data["miner"], data["miner_share"]
-            sender = tx["sender"].lower()  # tx will be in json as object cant be sent over network
-            recipient = tx["recipient"].lower()
-            amount = int(tx["amount"])
-
-            parentstotaljuice = 0
-            parents = []
-            reject_job = False
-
+        if parent_hashes:
             for parent_hash in parent_hashes:
-                if parentstotaljuice >= amount + fee:
+                if parentstotaljuice >= juice_needed:
                     break
                 parent = self.get_tx_by_hash(parent_hash)
                 if not parent:
-                    reject_job = True
-                    break
-                if parent.recipient.lower() == sender and parent.juice > 0:
+                    return None
+                if parent.recipient.lower() == tx.sender.lower() and parent.juice > 0:
                     parents.append(parent)
                     parentstotaljuice += parent.juice
                 else:
-                    reject_job = True
-                    break
-
-            if reject_job:
-                return False
-
-            if parentstotaljuice >= amount + fee:
-                try:
-                    # ⬇️ Process token/contract logic from peer-mined tx
-                    if tx["data"]:
-                        self._process_contract_interaction(tx)
-
-                    finalizedtx = self.dag.add_transaction(sender, recipient, amount, fee, parents, tx["nonce"], tx["data"])
-                    noderewardtx = self.dag.add_transaction(sender, NODE_ADDRESS.lower(), fee, 0, parents, finalizedtx.nonce + 1)
-                    minerrewardtx = self.dag.add_transaction(NODE_ADDRESS.lower(), miner.lower(), fee * miner_share, 0, [noderewardtx], self.get_transaction_count(NODE_ADDRESS, "latest"))
-                    self.remove_bad_nodes()
-                    self.save_dag()
-                    self.last_speed = finalizedtx.timestamp - tx["timestamp"]
-                    self.save_speed()
-                    for tx in [finalizedtx, noderewardtx, minerrewardtx]: self.ws.broadcast_tx(tx)
-                    return True
-                except JuiceNotEnough:
-                    return False
-                except Exception as e:
-                    print(traceback.format_exc())
                     return None
-            else:
-                self.remove_bad_nodes()
-                self.save_dag()
+        else:
+            for ptxn in self.dag.nodes:
+                ptx = self.dag.nodes[ptxn].get('transaction', None)
+                if ptx and ptx.recipient.lower() == tx.sender.lower():
+                    juice = int(ptx.juice)
+                    if juice_needed <= 0:
+                        break
+                    if juice > 0:
+                        parents.append(ptx)
+                        juice_needed -= juice
+
+            if juice_needed > 0:
+                return None
+
+        return parents
+
+    def try_process_contract(self, tx):
+        if tx.data and tx.data != '0x':
+            try:
+                self._process_contract_interaction(tx)
+                return True
+            except Exception as e:
                 return False
+        return True
+
+    def finalize_and_broadcast(self, tx, parents, node_addr, miner_addr, miner_share): # broadcast to ws, not peers
+        sender = tx.sender.lower()
+        recipient = tx.recipient.lower()
+        amount = int(tx.amount)
+        fee = int(tx.gas)
+
+        finalizedtx = self.dag.add_transaction(sender, recipient, amount, fee, parents, tx.nonce, tx.data)
+        noderewardtx = self.dag.add_transaction(sender, node_addr, fee, 0, parents, finalizedtx.nonce + 1)
+        minerrewardtx = self.dag.add_transaction(node_addr, miner_addr, fee * miner_share, 0, [noderewardtx], self.get_transaction_count(NODE_ADDRESS, "latest"))
+
+        self.last_speed = finalizedtx.timestamp - tx.timestamp
+        self.remove_bad_nodes()
+        self.save_dag()
+        self.save_speed()
+
+        for tx_ in [finalizedtx, noderewardtx, minerrewardtx]:
+            self.ws.broadcast_tx(tx_)
+
+        return finalizedtx, noderewardtx, minerrewardtx
+
+    def handle_peer_voting(self, finalizedtx, parents, fee, node_addr, miner, miner_share):
+        if len(self.p2p.peer_sockets) == 0:
+            return
+        response = self.p2p.broadcast({
+            "tx": finalizedtx.__json__(),
+            "parent_hashes": [p.hash for p in parents],
+            "node": node_addr,
+            "miner": miner,
+            "miner_share": miner_share
+        })
+        agree = response.count(True)
+        disagree = response.count(False)
+        if disagree > agree:
+            pct = (disagree / (agree + disagree)) * 100
+            print(f"{pct}% ({disagree}) disagree? Sounds like a Sybil skill issue... Welcome to the DAG, lil' tx {finalizedtx.hash}.")
+
+    def submit_mined(self, mined_txs: dict, miner):
+        try:
+            reward_txs = []
+            for tx_hash, parent_hashes in mined_txs.items():
+                tx = next((t for t in self.mempool if t.hash == tx_hash), None)
+                if not tx:
+                    continue
+
+                parents = self.find_valid_parents(tx, parent_hashes)
+                if not parents:
+                    continue
+
+                if tx.nonce != self.get_transaction_count(tx.sender, "latest"):
+                    continue
+
+                if not self.try_process_contract(tx):
+                    continue
+
+                try:
+                    self.mempool.remove(tx)
+                except ValueError:
+                    pass
+
+                finalizedtx, noderewardtx, minerrewardtx = self.finalize_and_broadcast(
+                    tx, parents, NODE_ADDRESS, miner, MINER_FEE_SHARE
+                )
+
+                self.handle_peer_voting(finalizedtx, parents, tx.gas, NODE_ADDRESS, miner, MINER_FEE_SHARE)
+
+                reward_txs.append(minerrewardtx)
+
+            return True, reward_txs
+
         except Exception as e:
             print(traceback.format_exc())
+            return False, str(e)
+
+    def process_received(self, data):
+        try:
+            tx_json = data["tx"]
+            parent_hashes = data["parent_hashes"]
+            node_addr = data["node"]
+            miner = data["miner"]
+            miner_share = data["miner_share"]
+
+            tx = Transaction(
+                sender=tx_json["sender"],
+                recipient=tx_json["recipient"],
+                amount=tx_json["amount"],
+                gas=tx_json["gas"],
+                parents=[],
+                nonce=tx_json["nonce"],
+                data=tx_json.get("data", "0x")
+            )
+            tx.timestamp = int(tx_json.get("timestamp", time.time())) * 1_000_000 # convert seconds to ns, as Transaction(...) uses ns, json uses s
+            parents = self.find_valid_parents(tx, parent_hashes)
+            if not parents:
+                return False
+
+            if not self.try_process_contract(tx):
+                return False
+
+            finalizedtx, noderewardtx, minerrewardtx = self.finalize_and_broadcast(
+                tx, parents, node_addr, miner, miner_share
+            )
+
+            return True
+
+        except Exception:
+            print(traceback.format_exc())
             return None
+
+
+    def mine(self, tx):
+        try:
+            parents = self.find_valid_parents(tx)
+            if not parents:
+                return False
+
+            expected_nonce = self.get_transaction_count(tx.sender, "latest")
+            if tx.nonce != expected_nonce:
+                return False
+
+            if not self.try_process_contract(tx):
+                return 'drop'
+
+            finalizedtx, noderewardtx, minerrewardtx = self.finalize_and_broadcast(
+                tx, parents, NODE_ADDRESS, NETWORK_MINER, MINER_FEE_SHARE
+            )
+
+            self.handle_peer_voting(finalizedtx, parents, tx.gas, NODE_ADDRESS, NETWORK_MINER, MINER_FEE_SHARE)
+            return True
+
+        except JuiceNotEnough:
+            return False
+        except Exception:
+            print(traceback.format_exc())
+            return False
 
     def compact_dag(self, fields):
         compacted = []
@@ -368,80 +416,13 @@ class Core:
                         active = True
 
                 for tx in list(self.mempool):
-                    parents = []
-                    juice_needed = int(tx.amount + tx.gas)
-
-                    for ptxn in self.dag.nodes:
-                        ptx = self.dag.nodes[ptxn].get('transaction', None)
-                        if ptx:
-                            if ptx.recipient == tx.sender:
-                                juice = int(ptx.juice)
-                                if juice_needed == 0:
-                                    break
-                                elif juice == 0:
-                                    pass
-                                elif juice >= juice_needed:
-                                    parents.append(ptx)
-                                    juice_needed = 0
-                                elif juice > 0:
-                                    parents.append(ptx)
-                                    juice_needed -= juice
-
-                    if juice_needed > 0:
-                        # miner couldn't find enough juice
-                        # we already know from the check at sendRawTransaction(...) that balance is valid in pending
-                        # so this tx is fine
-                        continue  # skip, let another miner try later
-
-                    expected_nonce = self.get_transaction_count(tx.sender, "latest")
-                    if tx.nonce != expected_nonce: 
-                        # we already know from the check at sendRawTransaction(...) that nonce is valid in pending
-                        # so that means, another tx from same sender must be mined first 
-                        # this one is still valid
-                        continue  # skip, try again later
-
-                    try:
-                        self.mempool.remove(tx)  # remove from mempool to avoid mining again
-                    except:
-                        continue  # tx already mined in meantime somehow
-
-                    try:
-                        # ⬇️ PROCESS TOKEN / CONTRACT INTERACTIONS HERE
-                        if tx.data and (tx.data != '0x'):
-                            self._process_contract_interaction(tx)
-
-                        finalizedtx = self.dag.add_transaction(tx.sender, tx.recipient, tx.amount, tx.gas, parents, tx.nonce, tx.data)
-                        noderewardtx = self.dag.add_transaction(tx.sender, NODE_ADDRESS.lower(), tx.gas, 0, parents, finalizedtx.nonce + 1)
-                        minerrewardtx = self.dag.add_transaction(NODE_ADDRESS.lower(), NETWORK_MINER.lower(), tx.gas * MINER_FEE_SHARE, 0, [noderewardtx], self.get_transaction_count(NODE_ADDRESS, "latest"))
-                        self.last_speed = finalizedtx.timestamp - tx.timestamp
-                        self.remove_bad_nodes()
-                        self.save_dag()
-                        self.save_speed()
-
-                        for tx in [finalizedtx, noderewardtx, minerrewardtx]: self.ws.broadcast_tx(tx)
-
-                        if len(self.p2p.peer_sockets) > 0:
-                            nodesresponse = self.p2p.broadcast({
-                                "tx": finalizedtx.__json__(),
-                                "parent_hashes": [parent.hash for parent in parents],
-                                "fee": finalizedtx.gas,
-                                "miner": NETWORK_MINER,
-                                "miner_share": MINER_FEE_SHARE
-                            })
-
-                            agree = nodesresponse.count(True)
-                            disagree = nodesresponse.count(False)
-
-                            totalvotes = agree + disagree
-
-                            if disagree > agree:
-                                disagree_percent = (disagree / totalvotes) * 100
-                                print(f"{disagree_percent}% ({disagree}) disagree? Sounds like a Sybil skill issue. Or, we fcked up big time... But last I checked, we weren't a democracy. Welcome to the DAG, lil' tx {finalizedtx.hash}.")
-
-                    except JuiceNotEnough:
-                        continue
-                    except Exception as e:
-                        print(traceback.format_exc())
+                    mined = self.mine(tx)
+                    if mined in [True, 'drop']:
+                        try:
+                            self.mempool.remove(tx)
+                        except:
+                            pass  # already gone?!
+                    else:
                         continue
 
         self.passive_miner_thread = Thread(target=_mine_passive, daemon=True)
