@@ -8,7 +8,9 @@ import os
 import sys
 import json
 import time
-from threading import Thread
+from readerwriterlock.rwlock import RWLockFair
+from copy import deepcopy
+from threading import Thread, Condition, Lock
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -32,6 +34,7 @@ legendary_number = 6934  # Chosen by the ancient gods of computation
 
 class Core:
     def __init__(self, p2p, ws):
+        self.dag_lock = RWLockFair()
         if os.path.isfile('dag'):
             self.load_dag()
             self.genesis = self.dag.nodes[list(self.dag.nodes)[0]]['transaction']
@@ -44,11 +47,15 @@ class Core:
         else:
             self.tokens = {}
             self.save_tokens()
-            
+
         self.mempool = []
         self.picked = []
         self.funnel = []
-        self.raw_txs = {}        
+        self.raw_txs = {}
+        self.mempool_lock = RWLockFair()
+        self.picked_lock = RWLockFair()
+        self.funnel_cn = Condition()
+        self.raw_txs_lock = Lock()
 
         self.p2p = p2p
         self.p2p.process_received = self.process_received
@@ -69,50 +76,60 @@ class Core:
         if nonce == None:
             nonce = self.get_transaction_count(sender)
         transaction = Transaction(sender, recipient, amount, gas, [], nonce, data) # pending tx, diff from normal ones
-        self.mempool.append(transaction)
+        with self.mempool_lock.gen_wlock(): self.mempool.append(transaction)
         return transaction
 
     def remove_bad_nodes(self):
-        for i in list(self.dag.nodes):
-            if not self.dag.nodes[i].get('transaction'):
+        with self.dag_lock.gen_rlock(): node_list = list(self.dag.nodes) # snapshot
+        nodes_to_remove = [i for i in node_list if not self.dag.nodes[i].get('transaction')]
+
+        with self.dag_lock.gen_wlock():
+            for i in nodes_to_remove:
                 self.dag.remove_node(i)
 
     def get_balance(self, address, mode = 'latest'):
         address = address.lower()
+        with self.dag_lock.gen_rlock(): nodes_snapshot = list(self.dag.nodes.values())
         confirmed_balance = sum(
-            tx.juice for node in self.dag.nodes.values()
+            tx.juice for node in nodes_snapshot
             if (tx := node.get("transaction"))
             and tx.recipient == address
             and tx.juice > 0
         )
         if mode == 'latest': return confirmed_balance
 
-        mempool_balance = (
-            sum(tx.amount for tx in self.mempool if tx.recipient == address)
-            - sum(tx.amount + tx.gas for tx in self.mempool if tx.sender == address)
-        )
+        with self.mempool_lock.gen_rlock(): 
+            mempool_balance = (
+                sum(tx.amount for tx in self.mempool if tx.recipient == address)
+                - sum(tx.amount + tx.gas for tx in self.mempool if tx.sender == address)
+            )
         return confirmed_balance + mempool_balance
 
     def get_transaction_count(self, sender_address, mode = 'latest'):
         """Counts the number of transactions in the DAG with a specific sender address."""
-        count = 0
-        for tx_hash in self.dag.nodes:
-            transaction = self.get_tx_by_hash(tx_hash)
-            if transaction:
-                if transaction.sender == sender_address.lower():
-                    count += 1
+        with self.dag_lock.gen_rlock(): nodes_snapshot = list(self.dag.nodes.values())
+        count = sum(
+            1 for node in nodes_snapshot
+            if (tx := node.get("transaction"))
+            and tx.sender == sender_address.lower()
+        )
         if mode.lower() == 'latest': return count # stop, dont count pending if mode is latest
-        for pending_tx in self.mempool:
-            if pending_tx.sender == sender_address.lower():
-                count += 1
+        with self.mempool_lock.gen_rlock():
+            for pending_tx in self.mempool:
+                if pending_tx.sender == sender_address.lower():
+                    count += 1
         return count
 
     def get_tx_by_number(self, n: int):
-        return self.dag.nodes[list(self.dag.nodes)[n]]['transaction'] if len(self.dag.nodes) > n else None
+        with self.dag_lock.gen_rlock(): nodes_snapshot = dict(self.dag.nodes)
+        nodes_list = list(nodes_snapshot)
+        return nodes_snapshot[nodes_list[n]].get('transaction') if len(nodes_list) > n else None
 
     def get_tx_by_hash(self, tx_hash):
-        if not tx_hash in list(self.dag.nodes): return None
-        txnode = self.dag.nodes[tx_hash]
+        with self.dag_lock.gen_rlock(): nodes_snapshot = dict(self.dag.nodes)
+        if tx_hash not in nodes_snapshot:
+            return None
+        txnode = nodes_snapshot[tx_hash]
         return txnode.get('transaction', None)
 
     def generate_job(self, node_miner = False):
@@ -120,8 +137,8 @@ class Core:
         if not node_miner: self.last_miner_request = time.time()
         if len(self.mempool) == 0:
             return 'NO_JOB'
-        tx = self.mempool.pop(0)
-        self.picked.append({"tx": tx, "timestamp": time.time_ns()})
+        with self.mempool_lock.gen_wlock(): tx = self.mempool.pop(0)
+        with self.picked_lock.gen_wlock(): self.picked.append({"tx": tx, "timestamp": time.time_ns()})
         job = {"transactions": [tx if node_miner else tx.__json__()]}
         return job
 
@@ -129,12 +146,14 @@ class Core:
         def _retry():
             while True:
                 time.sleep(0.5)
+
                 now = time.time_ns()
                 expired = []
 
-                for p in self.picked:
-                    if now - p["timestamp"] >= 2 * 1e9:
-                        expired.append(p)
+                with self.picked_lock.gen_rlock():
+                    for p in self.picked:
+                        if now - p["timestamp"] >= 2 * 1e9:
+                            expired.append(p)
 
                 expired.sort(key=lambda p: p["tx"].timestamp) # ensures proper ordering, no nonce mismatches
                 for p in expired:
@@ -148,37 +167,44 @@ class Core:
                         continue
 
                     # send to funnel
-                    self.funnel.append({
-                        "tx": tx,
-                        "parents": parents,
-                        "miner": NETWORK_MINER
-                    })
+                    with self.funnel_cn:
+                        self.funnel.append({
+                            "tx": tx,
+                            "parents": parents,
+                            "miner": NETWORK_MINER
+                        })
+                        self.funnel_cn.notify()
 
-                    try:
-                        self.picked.remove(p)
-                    except:
-                        pass
+                    with self.picked_lock.gen_wlock():
+                        try:
+                            self.picked.remove(p)
+                        except:
+                            pass
 
         Thread(target=_retry, daemon=True).start()
 
     def start_funnel(self):
         def _funnel():
             while True:
-                if not self.funnel:
-                    time.sleep(0) # breather
-                    continue
+                with self.funnel_cn:
+                    if not self.funnel:
+                        self.funnel_cn.wait()
+                
+                    # sort funnel based on timestamp
+                    self.funnel.sort(key=lambda x: x["tx"].timestamp)
+                    tx_entry = self.funnel[0]
+                    tx_ts = tx_entry["tx"].timestamp
 
-                # sort funnel based on timestamp
-                self.funnel.sort(key=lambda x: x["tx"].timestamp)
+                with self.picked_lock.gen_rlock():
+                    # hold off if earlier-picked txs exist
+                    if any(p["tx"].timestamp < tx_ts for p in self.picked):
+                        continue
 
-                tx_entry = self.funnel[0]
-                tx_ts = tx_entry["tx"].timestamp
+                with self.funnel_cn:
+                    if not self.funnel or self.funnel[0]["tx"].timestamp != tx_ts:
+                        continue  # race: funnel changed, retry
+                    tx_entry = self.funnel.pop(0)
 
-                # hold off if earlier-picked txs exist
-                if any(p["tx"].timestamp < tx_ts for p in self.picked):
-                    continue
-
-                tx_entry = self.funnel.pop(0)
                 tx = tx_entry["tx"]
                 if tx.nonce != self.get_transaction_count(tx.sender, "latest"):
                     continue
@@ -277,12 +303,13 @@ class Core:
                     parents.append(parent)
                     parentstotaljuice += parent.juice
         else:
-            for ptxn in self.dag.nodes:
-                ptx = self.dag.nodes[ptxn].get('transaction', None)
+            with self.dag_lock.gen_rlock(): nodes_snapshot = dict(self.dag.nodes)
+            for ptxn, node in nodes_snapshot.items():
+                ptx = node.get('transaction', None)
                 if ptx and ptx.recipient.lower() == tx.sender.lower():
-                    juice = int(ptx.juice)
                     if juice_needed <= 0:
                         break
+                    juice = int(ptx.juice)
                     if juice > 0:
                         parents.append(ptx)
                         juice_needed -= juice
@@ -307,9 +334,13 @@ class Core:
         amount = int(tx.amount)
         fee = int(tx.gas)
 
-        finalizedtx = self.dag.add_transaction(sender, recipient, amount, fee, parents, tx.nonce, tx.data)
-        noderewardtx = self.dag.add_transaction(sender, node_addr, fee, 0, parents, finalizedtx.nonce + 1)
-        minerrewardtx = self.dag.add_transaction(node_addr, miner_addr, fee * miner_share, 0, [noderewardtx], self.get_transaction_count(NODE_ADDRESS, "latest"))
+        with self.dag_lock.gen_wlock():
+            finalizedtx = self.dag.add_transaction(sender, recipient, amount, fee, parents, tx.nonce, tx.data)
+            noderewardtx = self.dag.add_transaction(sender, node_addr, fee, 0, parents, finalizedtx.nonce + 1)
+        nodenonce = self.get_transaction_count(NODE_ADDRESS, "latest")
+
+        with self.dag_lock.gen_wlock():
+            minerrewardtx = self.dag.add_transaction(node_addr, miner_addr, fee * miner_share, 0, [noderewardtx], nodenonce)
 
         self.last_speed = finalizedtx.timestamp - tx.timestamp
         self.remove_bad_nodes()
@@ -324,10 +355,11 @@ class Core:
     def handle_peer_voting(self, finalizedtx, parents, fee, node_addr, miner, miner_share):
         if len(self.p2p.peer_sockets) == 0:
             return
+        with self.raw_txs_lock: raw_tx = self.raw_txs[finalizedtx.hash]
         response = self.p2p.broadcast({
-            "raw_tx": self.raw_txs[finalizedtx.hash],
+            "raw_tx": raw_tx,
             "timestamp": finalizedtx.timestamp,
-            "gas": tx.gas,
+            "gas": finalizedtx.gas,
             "parent_hashes": [p.hash for p in parents],
             "node": node_addr,
             "miner": miner,
@@ -343,16 +375,18 @@ class Core:
         try:
             reward_txs = []
             for tx_hash, parent_hashes in mined_txs.items():
-                tx = next((t for t in self.mempool if t.hash == tx_hash), None)
+                picked_entry = None
+                with self.picked_lock.gen_rlock(): picked_entry = next((p for p in self.picked if p["tx"].hash == tx_hash), None)
+                if not picked_entry:
+                    continue # not in picked list
+
+                tx = picked_entry["tx"]
+
                 if not tx:
                     continue
 
-                if not any(p["tx"].hash == tx.hash for p in self.picked):
-                    continue
-# not in picked list
-
-                if any(f["tx"].hash == tx.hash for f in self.funnel):
-                    continue  # already in funnel
+                with self.funnel_cn: 
+                    if any(f["tx"].hash == tx.hash for f in self.funnel): continue  # already in funnel
 
                 parents = self.find_valid_parents(tx, parent_hashes)
                 if not parents:
@@ -361,12 +395,14 @@ class Core:
                 if not self.simulate_contract(tx):
                     continue
 
-                self.picked = [p for p in self.picked if p["tx"].hash != tx.hash]
-                self.funnel.append({
-                    "tx": tx,
-                    "parents": parents,
-                    "miner": miner
-                })
+                with self.picked_lock.gen_wlock(): self.picked = [p for p in self.picked if p["tx"].hash != tx.hash]
+                with self.funnel_cn:
+                    self.funnel.append({
+                        "tx": tx,
+                        "parents": parents,
+                        "miner": miner
+                    })
+                    self.funnel_cn.notify()
 
             return True, reward_txs
         except Exception as e:
@@ -421,8 +457,9 @@ class Core:
             miner = data["miner"]
             miner_share = data["miner_share"]
 
-            if any(f["tx"].hash == tx.hash for f in self.funnel):
-                return False  # already in funnel
+            with self.funnel_cn: 
+                if any(f["tx"].hash == tx.hash for f in self.funnel):
+                    return False  # already in funnel
 
             parents = self.find_valid_parents(tx, parent_hashes)
             if not parents:
@@ -432,12 +469,13 @@ class Core:
                 return False
 
             self.last_received_timestamp_ns = tx.timestamp
-            self.funnel.append({
-                "tx": tx,
-                "parents": parents,
-                "miner": miner
-            })
-
+            with self.funnel_cn:
+                self.funnel.append({
+                    "tx": tx,
+                    "parents": parents,
+                    "miner": miner
+                })
+                self.funnel_cn.notify()
             return True
 
         except Exception:
@@ -446,27 +484,30 @@ class Core:
 
     def mine(self, tx):
         try:
-            if any(f["tx"].hash == tx.hash for f in self.funnel):
-                return False  # already in funnel
+            with self.funnel_cn: 
+                if any(f["tx"].hash == tx.hash for f in self.funnel):
+                    return False  # already in funnel
 
-            if not any(p["tx"].hash == tx.hash for p in self.picked):
-                return False
-# not in picked list
+            with self.picked_lock.gen_rlock():
+                if not any(p["tx"].hash == tx.hash for p in self.picked):
+                    return False # not in picked list
 
             parents = self.find_valid_parents(tx)
             if not parents:
                 return False
 
             if not self.simulate_contract(tx):
-                self.picked = [p for p in self.picked if p["tx"].hash != tx.hash] # drop
+                with self.picked_lock.gen_wlock(): self.picked = [p for p in self.picked if p["tx"].hash != tx.hash] # drop
                 return False
 
-            self.picked = [p for p in self.picked if p["tx"].hash != tx.hash]
-            self.funnel.append({
-                "tx": tx,
-                "parents": parents,
-                "miner": NETWORK_MINER
-            })
+            with self.picked_lock.gen_wlock(): self.picked = [p for p in self.picked if p["tx"].hash != tx.hash]
+            with self.funnel_cn:
+                self.funnel.append({
+                    "tx": tx,
+                    "parents": parents,
+                    "miner": NETWORK_MINER
+                })
+                self.funnel_cn.notify()
 
             return True
 
@@ -504,8 +545,9 @@ class Core:
 
     def compact_dag(self, fields):
         compacted = []
-        for tx_hash in self.dag.nodes:
-            tx = self.dag.nodes[tx_hash].get('transaction', None)
+        with self.dag_lock.gen_rlock(): nodes_snapshot = dict(self.dag.nodes)
+        for tx_hash, node in nodes_snapshot.items():
+            tx = node.get('transaction', None)
             if not tx: continue # bad node in dag, somehow not cleaned up
             _tx_json = tx.__json__()
             tx_json = {}
@@ -516,10 +558,11 @@ class Core:
 
     def get_fee(self, tx = None):
         base_gas = 0.000069
-        if len(self.mempool) == 0:
-            return base_gas * u
-        first_tx_time = self.mempool[0].timestamp
-        last_tx_time = self.mempool[-1].timestamp
+        with self.mempool_lock.gen_rlock(): 
+            if len(self.mempool) == 0:
+                return base_gas * u
+            first_tx_time = self.mempool[0].timestamp
+            last_tx_time = self.mempool[-1].timestamp
         time_diff = (last_tx_time - first_tx_time) / 1_000_000_000  # Convert ns to seconds
         tps = (len(self.mempool) / time_diff) if time_diff > 0 else 0 # TPS (Transactions per second)
 
@@ -529,9 +572,10 @@ class Core:
         return total_gas
 
     def find_pending(self, sender, nonce):
-        for tx in self.mempool:
-            if tx.sender.lower() == sender.lower() and int(tx.nonce) == int(nonce):
-                return tx
+        with self.mempool_lock.gen_rlock():
+            for tx in self.mempool:
+                if tx.sender.lower() == sender.lower() and int(tx.nonce) == int(nonce):
+                    return tx
         return None
 
     def send_raw_transaction(self, raw_tx):
@@ -566,7 +610,7 @@ class Core:
             to_replace = self.find_pending(sender, nonce)
             if to_replace:
                 try:
-                    self.mempool.remove(to_replace)
+                    with self.mempool_lock.gen_wlock(): self.mempool.remove(to_replace)
                     txh = self.add_pending(sender, recipient, amount, fee, nonce, data).hash
                     return {'transactionHash': txh}
                 except ValueError:
@@ -601,7 +645,7 @@ class Core:
 
             tx = self.add_pending(sender, recipient, amount, fee, nonce, data)
             txh = tx.hash
-            self.raw_txs[txh] = raw_tx
+            with self.raw_txs_lock: self.raw_txs[txh] = raw_tx
             self.last_received_timestamp_ns = tx.timestamp
             return {'transactionHash': txh}
 
@@ -644,8 +688,10 @@ class Core:
     def save_dag(self):
         """Save the DAG object to a file using pickle."""
         try:
+            with self.dag_lock.gen_rlock():
+                dag_snapshot = deepcopy(self.dag)
             with open('dag', 'wb') as f:
-                pickle.dump(self.dag, f)
+                pickle.dump(dag_snapshot, f)
         except Exception as e:
             print(traceback.format_exc())
 
