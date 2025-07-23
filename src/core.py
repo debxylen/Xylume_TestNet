@@ -178,6 +178,9 @@ class Core:
 
                 tx_entry = self.funnel.pop(0)
                 tx = tx_entry["tx"]
+                if tx.nonce != self.get_transaction_count(tx.sender, "latest"):
+                    continue
+
                 parents = tx_entry["parents"]
                 miner = tx_entry["miner"]
 
@@ -350,9 +353,6 @@ class Core:
                 if not parents:
                     continue
 
-                if tx.nonce != self.get_transaction_count(tx.sender, "latest"):
-                    continue
-
                 if not self.simulate_contract(tx):
                     continue
 
@@ -419,10 +419,6 @@ class Core:
 
             parents = self.find_valid_parents(tx)
             if not parents:
-                return False
-
-            expected_nonce = self.get_transaction_count(tx.sender, "latest")
-            if tx.nonce != expected_nonce:
                 return False
 
             if not self.simulate_contract(tx):
