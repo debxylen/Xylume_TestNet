@@ -67,11 +67,17 @@ class WSBroadcaster:
         with self.clients_lock:
             clients = list(self.connected_clients)
 
+        coros = []
+        to_remove = []
+
         for client in clients:
-            try:
-                await client.send(message)
-            except:
-                to_remove.append(client)
+            async def send_one(client=client):
+                try:
+                    await client.send(message)
+                except:
+                    to_remove.append(client)
+            coros.append(send_one())
+        await asyncio.gather(*coros, return_exceptions=True)
 
         with self.clients_lock:
             for client in to_remove:
