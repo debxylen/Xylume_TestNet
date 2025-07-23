@@ -242,12 +242,12 @@ class RPC(Flask):
 
     def handle_confirmation_speed(self, data):
         unit = 's' # default unit seconds
-        if len(data['params']) > 0: # if a param is given
-            unit = data['params'][0]
-        if unit == 's': speed = self.core.last_speed / (10**9) # ns to s
-        elif unit == 'ms': speed = self.core.last_speed / (10**6) # ns to ms
+        if len(data['params']) > 0:
+            unit = data['params'][0].lower()
+        if unit == 's': speed = self.core.last_speed / (1e9) # ns to s
+        elif unit == 'ms': speed = self.core.last_speed / (1e6) # ns to ms
         elif unit == 'ns': speed = self.core.last_speed # ns
-        else: speed = self.core.last_speed / (10**9) # default fallback s
+        else: speed = self.core.last_speed / (1e9) # default fallback s
         return jsonify({'jsonrpc': '2.0', 'result': speed, 'id': data.get('id')})
 
     def handle_compact_snapshot(self, data):
