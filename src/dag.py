@@ -42,8 +42,11 @@ class DAG(nx.DiGraph):
             tx_id = tx.hash
         
             self.add_node(tx_id, transaction=tx)
-        
-            juicetocollect = int(amount+gas)
+
+            # only deduct the amount here, do not include gas
+            # gas deduction is handled by separate transactions (sender → node, node → miner),
+            juicetocollect = int(amount)
+
             for parent in parents:
                 parent_tx = self.nodes[parent]['transaction'] if type(parent)==str else parent
                 if parent_tx.juice > 0:
