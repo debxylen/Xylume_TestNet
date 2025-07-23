@@ -371,11 +371,6 @@ class Core:
                     parents = []
                     juice_needed = int(tx.amount + tx.gas)
 
-                    try:
-                        self.mempool.remove(tx)  # remove from mempool to avoid mining again
-                    except:
-                        continue  # tx already mined in meantime somehow
-
                     for ptxn in self.dag.nodes:
                         ptx = self.dag.nodes[ptxn].get('transaction', None)
                         if ptx:
@@ -391,12 +386,24 @@ class Core:
                                 elif juice > 0:
                                     parents.append(ptx)
                                     juice_needed -= juice
-                    if not (juice_needed == 0):
-                        continue  # weird case where not enough juice could be found. cosmic rarity, as we checked when tx was received
+
+                    if juice_needed > 0:
+                        # miner couldn't find enough juice
+                        # we already know from the check at sendRawTransaction(...) that balance is valid in pending
+                        # so this tx is fine
+                        continue  # skip, let another miner try later
 
                     expected_nonce = self.get_transaction_count(tx.sender, "latest")
-                    if not tx.nonce == expected_nonce:
-                        continue  # nonce mismatch
+                    if tx.nonce != expected_nonce: 
+                        # we already know from the check at sendRawTransaction(...) that nonce is valid in pending
+                        # so that means, another tx from same sender must be mined first 
+                        # this one is still valid
+                        continue  # skip, try again later
+
+                    try:
+                        self.mempool.remove(tx)  # remove from mempool to avoid mining again
+                    except:
+                        continue  # tx already mined in meantime somehow
 
                     try:
                         # ⬇️ PROCESS TOKEN / CONTRACT INTERACTIONS HERE
