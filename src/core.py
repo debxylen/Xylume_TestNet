@@ -44,13 +44,20 @@ class Core:
         else:
             self.tokens = {}
             self.save_tokens()
+            
         self.mempool = []
+        self.picked = []
+        self.funnel = []
+        
         self.p2p = p2p
         self.p2p.process_received = self.process_received
         self.ws = ws
         self.last_speed = self.load_speed() # in nanoseconds
         self.last_miner_request = 0
-        self.mine_passive() # start passive mining thread
+        
+        self.start_funnel()
+        self.start_retry()
+        self.mine_passive()
         self.ws.start()
 
     def add_pending(self, sender, recipient, amount: int, gas, nonce = None, data = '0x'):
@@ -106,37 +113,83 @@ class Core:
         txnode = self.dag.nodes[tx_hash]
         return txnode.get('transaction', None)
 
-    def generate_job(self):
+    def generate_job(self, node_miner = False):
         """Generate a new mining job."""
-        self.last_miner_request = time.time()
+        if not node_miner: self.last_miner_request = time.time()
         if len(self.mempool) == 0:
             return 'NO_JOB'
-        transaction_to_mine = self.mempool[0] # 1 tx max per job
-        job = {"transactions": [transaction_to_mine.__json__()]}
+        tx = self.mempool.pop(0)
+        self.picked.append({"tx": tx, "timestamp": time.time_ns()})
+        job = {"transactions": [tx if node_miner else tx.__json__()]}
         return job
 
-    def retry_picked_loop(self):
+    def start_retry(self):
         def _retry():
             while True:
                 time.sleep(0.5)
-                now = time.time()
+                now = time.time_ns()
                 expired = []
 
-                for txh, meta in list(self.picked.items()):
-                    if now - meta["timestamp"] >= 2:  # timeout in seconds
-                        expired.append(txh)
+                for p in self.picked:
+                    if now - p["timestamp"] >= 2 * 1e9:
+                        expired.append(p)
 
-                for txh in expired:
+                expired.sort(key=lambda p: p["tx"].timestamp) # ensures proper ordering, no nonce mismatches
+                for p in expired:
+                    tx = p["tx"]
+
+                    parents = self.find_valid_parents(tx)
+                    if not parents:
+                        continue
+
+                    if not self.simulate_contract(tx):
+                        continue
+
+                    # send to funnel
+                    self.funnel.append({
+                        "tx": tx,
+                        "parents": parents,
+                        "miner": NETWORK_MINER
+                    })
+
                     try:
-                        self.mempool.append(self.picked[txh]["tx"])
-                    except Exception as e:
-                        print(f"Error re-adding tx {txh}: {e}")
-                    del self.picked[txh]
-                    print(f"⏱️ Re-added expired tx {txh} back to mempool.")
+                        self.picked.remove(p)
+                    except:
+                        pass
 
         Thread(target=_retry, daemon=True).start()
 
-    def _process_contract_interaction(self, tx):
+    def start_funnel(self):
+        def _funnel():
+            while True:
+                if not self.funnel:
+                    time.sleep(0) # breather
+                    continue
+
+                # sort funnel based on timestamp
+                self.funnel.sort(key=lambda x: x["tx"].timestamp)
+
+                tx_entry = self.funnel[0]
+                tx_ts = tx_entry["tx"].timestamp
+
+                # hold off if earlier-picked txs exist
+                if any(p["tx"].timestamp < tx_ts for p in self.picked):
+                    continue
+
+                tx_entry = self.funnel.pop(0)
+                tx = tx_entry["tx"]
+                parents = tx_entry["parents"]
+                miner = tx_entry["miner"]
+
+                finalizedtx, noderewardtx, minerrewardtx = self.finalize_and_broadcast(
+                    tx, parents, NODE_ADDRESS, miner, MINER_FEE_SHARE
+                )
+
+                self.handle_peer_voting(finalizedtx, parents, tx.gas, NODE_ADDRESS, miner, MINER_FEE_SHARE)
+
+        Thread(target=_funnel, daemon=True).start()
+
+    def _process_contract_interaction(self, tx, simulate=False):
         if type(tx) == dict:
             sender = tx["sender"].lower()
             recipient = tx["recipient"].lower()
@@ -150,13 +203,16 @@ class Core:
 
         if recipient in self.tokens:
             if len(data) != 138:
+                if simulate: return False
                 raise Exception('Invalid data length in token tx.')
             method_id = data[:10]
             if method_id == "0xa9059cbb":
                 token_recipient = '0x' + data[10:74][-40:]
                 token_amount = int(data[74:], 16)
                 if self.tokens[recipient]["balances"].get(sender, 0) < token_amount:
+                    if simulate: return False
                     raise Exception('Insufficient token balance.')
+                if simulate: return True
                 self.tokens[recipient]["balances"][sender] -= token_amount
                 self.tokens[recipient]["balances"][token_recipient] = self.tokens[recipient]["balances"].get(token_recipient, 0) + token_amount
                 self.save_tokens()
@@ -172,7 +228,9 @@ class Core:
                 name = ' '.join(f_params[5:])
                 token_address = string_to_hex_with_prefix(f'{nonce}token{sender}').lower()[:42]
                 if token_address in self.tokens:
+                    if simulate: return False
                     raise Exception('Token address collision')
+                if simulate: return True
                 self.tokens[token_address] = {
                     "authority": authority,
                     "symbol": symbol,
@@ -187,9 +245,16 @@ class Core:
                 mint_address = f_params[2].lower()
                 mint_amount = int(f_params[3])
                 if self.tokens.get(token_address, {}).get("authority") != sender:
+                    if simulate: return False
                     raise Exception('Not token authority')
+                if simulate: return True
                 self.tokens[token_address]["balances"][mint_address] = self.tokens[token_address]["balances"].get(mint_address, 0) + mint_amount
                 self.save_tokens()
+
+        return True
+
+    def simulate_contract(self, tx):
+        return self._process_contract_interaction(tx, simulate=True)
 
     def find_valid_parents(self, tx, parent_hashes=None):
         juice_needed = int(tx.amount + tx.gas)
@@ -202,12 +267,10 @@ class Core:
                     break
                 parent = self.get_tx_by_hash(parent_hash)
                 if not parent:
-                    return None
+                    continue
                 if parent.recipient.lower() == tx.sender.lower() and parent.juice > 0:
                     parents.append(parent)
                     parentstotaljuice += parent.juice
-                else:
-                    return None
         else:
             for ptxn in self.dag.nodes:
                 ptx = self.dag.nodes[ptxn].get('transaction', None)
@@ -277,6 +340,12 @@ class Core:
                 if not tx:
                     continue
 
+                if not any(p["tx"].hash == tx.hash for p in self.picked):
+                    continue# not in picked list
+
+                if any(f["tx"].hash == tx.hash for f in self.funnel):
+                    continue  # already in funnel
+
                 parents = self.find_valid_parents(tx, parent_hashes)
                 if not parents:
                     continue
@@ -284,24 +353,17 @@ class Core:
                 if tx.nonce != self.get_transaction_count(tx.sender, "latest"):
                     continue
 
-                if not self.try_process_contract(tx):
+                if not self.simulate_contract(tx):
                     continue
 
-                try:
-                    self.mempool.remove(tx)
-                except ValueError:
-                    pass
-
-                finalizedtx, noderewardtx, minerrewardtx = self.finalize_and_broadcast(
-                    tx, parents, NODE_ADDRESS, miner, MINER_FEE_SHARE
-                )
-
-                self.handle_peer_voting(finalizedtx, parents, tx.gas, NODE_ADDRESS, miner, MINER_FEE_SHARE)
-
-                reward_txs.append(minerrewardtx)
+                self.picked = [p for p in self.picked if p["tx"].hash != tx.hash]
+                self.funnel.append({
+                    "tx": tx,
+                    "parents": parents,
+                    "miner": miner
+                })
 
             return True, reward_txs
-
         except Exception as e:
             print(traceback.format_exc())
             return False, str(e)
@@ -323,17 +385,23 @@ class Core:
                 nonce=tx_json["nonce"],
                 data=tx_json.get("data", "0x")
             )
-            tx.timestamp = int(tx_json.get("timestamp", time.time())) * 1_000_000 # convert seconds to ns, as Transaction(...) uses ns, json uses s
+            tx.timestamp = int(tx_json.get("timestamp", time.time())) * 1_000_000_000
+
+            if any(f["tx"].hash == tx.hash for f in self.funnel):
+                return False  # already in funnel
+
             parents = self.find_valid_parents(tx, parent_hashes)
             if not parents:
                 return False
 
-            if not self.try_process_contract(tx):
+            if not self.simulate_contract(tx):
                 return False
-
-            finalizedtx, noderewardtx, minerrewardtx = self.finalize_and_broadcast(
-                tx, parents, node_addr, miner, miner_share
-            )
+            
+            self.funnel.append({
+                "tx": tx,
+                "parents": parents,
+                "miner": miner
+            })
 
             return True
 
@@ -341,9 +409,14 @@ class Core:
             print(traceback.format_exc())
             return None
 
-
     def mine(self, tx):
         try:
+            if any(f["tx"].hash == tx.hash for f in self.funnel):
+                return False  # already in funnel
+
+            if not any(p["tx"].hash == tx.hash for p in self.picked):
+                return False# not in picked list
+
             parents = self.find_valid_parents(tx)
             if not parents:
                 return False
@@ -352,14 +425,17 @@ class Core:
             if tx.nonce != expected_nonce:
                 return False
 
-            if not self.try_process_contract(tx):
-                return 'drop'
+            if not self.simulate_contract(tx):
+                self.picked = [p for p in self.picked if p["tx"].hash != tx.hash] # drop
+                return False
 
-            finalizedtx, noderewardtx, minerrewardtx = self.finalize_and_broadcast(
-                tx, parents, NODE_ADDRESS, NETWORK_MINER, MINER_FEE_SHARE
-            )
+            self.picked = [p for p in self.picked if p["tx"].hash != tx.hash]
+            self.funnel.append({
+                "tx": tx,
+                "parents": parents,
+                "miner": NETWORK_MINER
+            })
 
-            self.handle_peer_voting(finalizedtx, parents, tx.gas, NODE_ADDRESS, NETWORK_MINER, MINER_FEE_SHARE)
             return True
 
         except JuiceNotEnough:
@@ -367,6 +443,32 @@ class Core:
         except Exception:
             print(traceback.format_exc())
             return False
+
+    def mine_passive(self):
+        def _mine_passive():
+            active = False
+            while True:
+                time.sleep(0.1)  # breather
+
+                if (time.time() - self.last_miner_request) <= 4:
+                    if active:
+                        print("Node-Miner Deactivated.")
+                        active = False
+                    continue
+                else:
+                    if not active:
+                        print("Node-Miner Activated.")
+                        active = True
+
+                job = self.generate_job(node_miner=True)
+                if job == 'NO_JOB':
+                    continue
+                for tx in job["transactions"]:
+                    mined = self.mine(tx)
+
+        self.passive_miner_thread = Thread(target=_mine_passive, daemon=True)
+        self.passive_miner_thread.start()
+
 
     def compact_dag(self, fields):
         compacted = []
@@ -399,34 +501,6 @@ class Core:
             if tx.sender.lower() == sender.lower() and int(tx.nonce) == int(nonce):
                 return tx
         return None
-
-    def mine_passive(self):
-        def _mine_passive():
-            active = False
-            while True:
-                time.sleep(0.1)  # avoid oofing cpu
-                if (time.time() - self.last_miner_request) <= 4:
-                    if active:
-                        print("Network Miner Deactivated.")
-                        active = False
-                    continue
-                else:
-                    if not active:
-                        print("Network Miner Activated.")
-                        active = True
-
-                for tx in list(self.mempool):
-                    mined = self.mine(tx)
-                    if mined in [True, 'drop']:
-                        try:
-                            self.mempool.remove(tx)
-                        except:
-                            pass  # already gone?!
-                    else:
-                        continue
-
-        self.passive_miner_thread = Thread(target=_mine_passive, daemon=True)
-        self.passive_miner_thread.start()
 
     def send_raw_transaction(self, raw_tx):
         try:
