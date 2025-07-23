@@ -42,6 +42,7 @@ class Core:
             self.genesis = Transaction(sender=NULL_ADDRESS, recipient=MINT_ADDRESS, amount=INITIAL_SUPPLY, gas=0, parents=[])
             self.dag = DAG(self.genesis)
             self.save_dag()
+        self.tokens_lock = RWLockFair()
         if os.path.isfile('tokens.json'):
             self.load_tokens()
         else:
@@ -96,6 +97,7 @@ class Core:
             and tx.recipient == address
             and tx.juice > 0
         )
+
         if mode == 'latest': return confirmed_balance
 
         with self.mempool_lock.gen_rlock(): 
@@ -232,25 +234,37 @@ class Core:
             nonce = tx.nonce
             data = tx.data
 
-        if recipient in self.tokens:
+        with self.tokens_lock.gen_rlock():
+            token_exists = recipient in self.tokens
+
+        if token_exists:
             if len(data) != 138:
                 if simulate: return False
                 raise Exception('Invalid data length in token tx.')
+
             method_id = data[:10]
-            if method_id == "0xa9059cbb":
+            if method_id == "0xa9059cbb":  # transfer(address,uint256)
                 token_recipient = '0x' + data[10:74][-40:]
                 token_amount = int(data[74:], 16)
-                if self.tokens[recipient]["balances"].get(sender, 0) < token_amount:
+
+                with self.tokens_lock.gen_rlock():
+                    sender_balance = self.tokens[recipient]["balances"].get(sender, 0)
+
+                if sender_balance < token_amount:
                     if simulate: return False
                     raise Exception('Insufficient token balance.')
                 if simulate: return True
-                self.tokens[recipient]["balances"][sender] -= token_amount
-                self.tokens[recipient]["balances"][token_recipient] = self.tokens[recipient]["balances"].get(token_recipient, 0) + token_amount
+
+                with self.tokens_lock.gen_wlock():
+                    self.tokens[recipient]["balances"][sender] -= token_amount
+                    self.tokens[recipient]["balances"][token_recipient] = \
+                        self.tokens[recipient]["balances"].get(token_recipient, 0) + token_amount
                 self.save_tokens()
 
         elif recipient == TOKEN_CONTRACT.lower():
             f_params = hex_to_string(data).split(" ")
             f_id = f_params[0]
+
             if f_id == "createToken":
                 authority = f_params[1].lower()
                 initial_mint_address = f_params[2].lower()
@@ -258,28 +272,38 @@ class Core:
                 symbol = f_params[4]
                 name = ' '.join(f_params[5:])
                 token_address = string_to_hex_with_prefix(f'{nonce}token{sender}').lower()[:42]
-                if token_address in self.tokens:
-                    if simulate: return False
-                    raise Exception('Token address collision')
+
+                with self.tokens_lock.gen_rlock():
+                    if token_address in self.tokens:
+                        if simulate: return False
+                        raise Exception('Token address collision')
                 if simulate: return True
-                self.tokens[token_address] = {
-                    "authority": authority,
-                    "symbol": symbol,
-                    "name": name,
-                    "balances": {
-                        initial_mint_address: initial_mint_amount
+
+                with self.tokens_lock.gen_wlock():
+                    self.tokens[token_address] = {
+                        "authority": authority,
+                        "symbol": symbol,
+                        "name": name,
+                        "balances": {
+                            initial_mint_address: initial_mint_amount
+                        }
                     }
-                }
                 self.save_tokens()
+
             elif f_id == "mintToken":
                 token_address = f_params[1].lower()
                 mint_address = f_params[2].lower()
                 mint_amount = int(f_params[3])
-                if self.tokens.get(token_address, {}).get("authority") != sender:
-                    if simulate: return False
-                    raise Exception('Not token authority')
+
+                with self.tokens_lock.gen_rlock():
+                    if self.tokens.get(token_address, {}).get("authority") != sender:
+                        if simulate: return False
+                        raise Exception('Not token authority')
                 if simulate: return True
-                self.tokens[token_address]["balances"][mint_address] = self.tokens[token_address]["balances"].get(mint_address, 0) + mint_amount
+
+                with self.tokens_lock.gen_wlock():
+                    self.tokens[token_address]["balances"][mint_address] = \
+                        self.tokens[token_address]["balances"].get(mint_address, 0) + mint_amount
                 self.save_tokens()
 
         return True
@@ -365,11 +389,11 @@ class Core:
             "miner": miner,
             "miner_share": miner_share,
         })
-        agree = response.count(True)
+        agree = response.count(True) + 1 # include our own agree
         disagree = response.count(False)
-        if disagree > agree:
+        if disagree >= agree:
             pct = (disagree / (agree + disagree)) * 100
-            print(f"{pct}% ({disagree}) disagree? Sounds like a Sybil skill issue... Welcome to the DAG, lil' tx {finalizedtx.hash}.")
+            print(f"{pct}% ({disagree}) disagree? Sounds like a Sybil skill issue. Or, we fcked up big time... But last I checked, we weren't a democracy. Welcome to the DAG, lil' tx {finalizedtx.hash}.")
 
     def submit_mined(self, mined_txs: dict, miner):
         try:
@@ -619,14 +643,16 @@ class Core:
             if not nonce == txcount:
                 return {'error': f'Invalid nonce provided: Given {nonce}, Expected {txcount}'}
 
-            if recipient.lower() in self.tokens:
+            tokens_snapshot = self.tokens.copy()
+
+            if recipient.lower() in tokens_snapshot:
                 if len(data) != 138:
                     return {'error': 'Invalid data length. Must be 138 characters.'}
                 method_id = data[:10]
                 if method_id == "0xa9059cbb":
                     token_recipient = '0x' + data[10:74][-40:]
                     token_amount = int(data[74:], 16)
-                    if self.tokens[recipient.lower()]["balances"].get(sender.lower(), 0) < token_amount:
+                    if tokens_snapshot[recipient.lower()]["balances"].get(sender.lower(), 0) < token_amount:
                         return {'error': f'Insufficient token balance.'}
 
             if recipient.lower() == TOKEN_CONTRACT.lower():
@@ -634,13 +660,13 @@ class Core:
                 f_id = f_params[0]
                 if f_id == "createToken":
                     token_address = string_to_hex_with_prefix(f'{nonce}token{sender.lower()}').lower()[:42]
-                    if token_address in self.tokens:
+                    if token_address in tokens_snapshot:
                         return {'error': f'A token with the address {token_address} already exists.'}
                 if f_id == "mintToken":
                     token_address = f_params[1].lower()
-                    if token_address not in self.tokens:
+                    if token_address not in tokens_snapshot:
                         return {'error': f'Token address {token_address} not found.'}
-                    if self.tokens[token_address]["authority"] != sender.lower():
+                    if tokens_snapshot[token_address].get("authority") != sender.lower():
                         return {'error': f'Only the token authority can mint tokens.'}
 
             tx = self.add_pending(sender, recipient, amount, fee, nonce, data)
@@ -716,8 +742,10 @@ class Core:
 
     def save_tokens(self):
         try:
+            with self.tokens_lock.gen_rlock():
+                tokens_snapshot = deepcopy(self.tokens)
             with open('tokens.json', 'w') as f:
-                json.dump(self.tokens, f, indent=2)
+                json.dump(tokens_snapshot, f, indent=2)
         except Exception as e:
             print(traceback.format_exc())
 
