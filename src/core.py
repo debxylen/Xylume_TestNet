@@ -48,12 +48,14 @@ class Core:
         self.mempool = []
         self.picked = []
         self.funnel = []
-        
+        self.raw_txs = {}        
+
         self.p2p = p2p
         self.p2p.process_received = self.process_received
         self.ws = ws
         self.last_speed = self.load_speed() # in nanoseconds
         self.last_miner_request = 0
+        self.last_received_timestamp_ns = 0
         
         self.start_funnel()
         self.start_retry()
@@ -323,11 +325,13 @@ class Core:
         if len(self.p2p.peer_sockets) == 0:
             return
         response = self.p2p.broadcast({
-            "tx": finalizedtx.__json__(),
+            "raw_tx": self.raw_txs[finalizedtx.hash],
+            "timestamp": finalizedtx.timestamp,
+            "gas": tx.gas,
             "parent_hashes": [p.hash for p in parents],
             "node": node_addr,
             "miner": miner,
-            "miner_share": miner_share
+            "miner_share": miner_share,
         })
         agree = response.count(True)
         disagree = response.count(False)
@@ -344,7 +348,8 @@ class Core:
                     continue
 
                 if not any(p["tx"].hash == tx.hash for p in self.picked):
-                    continue# not in picked list
+                    continue
+# not in picked list
 
                 if any(f["tx"].hash == tx.hash for f in self.funnel):
                     continue  # already in funnel
@@ -370,22 +375,51 @@ class Core:
 
     def process_received(self, data):
         try:
-            tx_json = data["tx"]
+            raw_tx = data["raw_tx"]
+            decoded_tx = tx_decode(raw_tx)
+
+            if int(decoded_tx['chainId']) != CHAIN_ID:
+                return False
+
+            if not verify_sign(decoded_tx):
+                return False
+
+            sender = decoded_tx['from_']
+            recipient = decoded_tx['to']
+            amount = int(decoded_tx['value'])
+            gas = data["gas"]
+            nonce = int(decoded_tx['nonce'])
+            data_field = decoded_tx['data']
+            if not data_field.startswith("0x"):
+                data_field = "0x" + data_field
+
+            # build tx object
+            tx = Transaction(
+                sender=sender,
+                recipient=recipient,
+                amount=amount,
+                gas=gas,
+                parents=[],
+                nonce=nonce,
+                data=data_field
+            )
+
+            if (int(data["timestamp"]) < self.last_received_timestamp_ns) or (int(data["timestamp"]) > time.time_ns()):
+                return False
+            tx.timestamp = int(data["timestamp"])
+
+            # validations
+            if amount < 0:
+                return False
+            if self.get_balance(sender, 'pending') < amount + gas:
+                return False
+            if decoded_tx['gas'] < gas or decoded_tx['gasPrice'] != 1:
+                return False
+
             parent_hashes = data["parent_hashes"]
             node_addr = data["node"]
             miner = data["miner"]
             miner_share = data["miner_share"]
-
-            tx = Transaction(
-                sender=tx_json["sender"],
-                recipient=tx_json["recipient"],
-                amount=tx_json["amount"],
-                gas=tx_json["gas"],
-                parents=[],
-                nonce=tx_json["nonce"],
-                data=tx_json.get("data", "0x")
-            )
-            tx.timestamp = int(tx_json.get("timestamp", time.time())) * 1_000_000_000
 
             if any(f["tx"].hash == tx.hash for f in self.funnel):
                 return False  # already in funnel
@@ -396,7 +430,8 @@ class Core:
 
             if not self.simulate_contract(tx):
                 return False
-            
+
+            self.last_received_timestamp_ns = tx.timestamp
             self.funnel.append({
                 "tx": tx,
                 "parents": parents,
@@ -415,7 +450,8 @@ class Core:
                 return False  # already in funnel
 
             if not any(p["tx"].hash == tx.hash for p in self.picked):
-                return False# not in picked list
+                return False
+# not in picked list
 
             parents = self.find_valid_parents(tx)
             if not parents:
@@ -563,7 +599,10 @@ class Core:
                     if self.tokens[token_address]["authority"] != sender.lower():
                         return {'error': f'Only the token authority can mint tokens.'}
 
-            txh = self.add_pending(sender, recipient, amount, fee, nonce, data).hash
+            tx = self.add_pending(sender, recipient, amount, fee, nonce, data)
+            txh = tx.hash
+            self.raw_txs[txh] = raw_tx
+            self.last_received_timestamp_ns = tx.timestamp
             return {'transactionHash': txh}
 
         except Exception as e:
