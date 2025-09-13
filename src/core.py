@@ -32,6 +32,19 @@ TOKEN_CONTRACT = constants["TOKEN_CONTRACT"]
 # Without it, the universe may collapse.
 legendary_number = 6934  # Chosen by the ancient gods of computation
 
+## To Do:
+## - Better error logging (printing function name along with traceback, etc)
+## - Integrate and deploy XEVM into production.
+## - Batch transactions and atomic bundles
+## - Transaction dependencies
+## - USDX
+## - Consider native token wrappers.
+## - Programmable wallets
+## - Mining pools
+## - Multi-sig
+## - RPC or Interaction-wrapping native contract
+## - Domain system
+
 class Core:
     def __init__(self, p2p, ws):
         self.dag_lock = RWLockFair()
@@ -396,8 +409,10 @@ class Core:
             print(f"{pct}% ({disagree}) disagree? Sounds like a Sybil skill issue. Or, we fcked up big time... But last I checked, we weren't a democracy. Welcome to the DAG, lil' tx {finalizedtx.hash}.")
 
     def submit_mined(self, mined_txs: dict, miner):
+        if not mined_txs:
+            return False, "No transactions submitted."
         try:
-            reward_txs = []
+            n_valid = 0
             for tx_hash, parent_hashes in mined_txs.items():
                 picked_entry = None
                 with self.picked_lock.gen_rlock(): picked_entry = next((p for p in self.picked if p["tx"].hash == tx_hash), None)
@@ -410,7 +425,8 @@ class Core:
                     continue
 
                 with self.funnel_cn: 
-                    if any(f["tx"].hash == tx.hash for f in self.funnel): continue  # already in funnel
+                    if any(f["tx"].hash == tx.hash for f in self.funnel): 
+                        continue  # already in funnel
 
                 parents = self.find_valid_parents(tx, parent_hashes)
                 if not parents:
@@ -428,7 +444,12 @@ class Core:
                     })
                     self.funnel_cn.notify()
 
-            return True, reward_txs
+                n_valid += 1
+
+            if n_valid:
+                return True, f"{n_valid}/{len(mined_txs)} transactions successfully validated."
+            else:
+                return False, "None of the transactions were successfully validated."
         except Exception as e:
             print(traceback.format_exc())
             return False, str(e)
