@@ -46,7 +46,7 @@
       const loader = document.getElementById("loaderOverlay");
       loader.style.opacity = 0;
       setTimeout(() => loader.remove(), 500);
-      const elements = document.querySelectorAll("div:not(#xylumeTestnet):not(#loaderOverlay):not(.loader-content):not(#bg-el)");
+      const elements = document.querySelectorAll("div:not(#xylumeTestnet):not(#loaderOverlay):not(.loader-content):not(#bg-el):not(#architecture-carousel):not(.carousel-card)");
 
       const observer = new IntersectionObserver((entries, observer) => {
         entries.forEach(entry => {
@@ -73,7 +73,7 @@
     }
 
     body {
-      background-color: #000000
+      background-color: #000000;
     }
 
     * {
@@ -95,11 +95,20 @@
       -ms-user-select: none;
     }
 
-    div:not(#xylumeTestnet):not(#loaderOverlay):not(.loader-content):not(#bg-el) {
+    div:not(#architecture-carousel):not(#xylumeTestnet):not(#loaderOverlay):not(.loader-content):not(#bg-el) {
       opacity: 0;
       transform: translateY(20px);
       transition: opacity 0.5s ease-out, transform 0.5s ease-out;
     }
+
+.carousel-card {
+  transition: all 0.5s ease;
+  position: absolute; /* default */
+}
+.carousel-card.active {
+  position: relative; /* stays in flow */
+  margin: 0 auto;
+}
 
     #header,
     #header *,
@@ -149,7 +158,7 @@
       transition: opacity 0.5s ease;
     }
 
-    .loader-content {
+     .loader-content {
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -163,12 +172,26 @@
         transform: rotate(360deg);
       }
     }
+/* Tailwind example */
+.carousel-card {
+  width: 80%; /* main card */
+  left: 50%;
+  transform: translateX(-50%) scale(1);
+}
+
+@media(min-width: 768px){
+  .carousel-card { width: 45%; } /* tablet */
+}
+@media(min-width: 1024px){
+  .carousel-card { width: 33%; } /* desktop */
+}
+
   </style>
 </head>
 
 <body class="h-full w-full text-base-content">
   <div id="loaderOverlay">
-    <div class="loader-content">
+    <div class="loader-content hidden">
       <svg xmlns="http://www.w3.org/2000/svg" style="animation: spin 1s linear infinite; opacity: 1;" width="64"
         height="64" viewBox="0 0 32 32">
         <path fill="#3b82f6"
@@ -176,13 +199,16 @@
       </svg>
     </div>
   </div>
-  <div class="fixed inset-0 w-screen h-screen bg-gradient-to-b from-gray-900 to-black -z-10" id="bg-el"></div>
+
+  <div class="absolute inset-0 w-screen h-screen bg-gradient-to-br from-[#08101A] to-black -z-10" id="bg-el">
+    <img src="./images/bg.jpeg" class="w-full h-full">
+  </div>
   <div id="xylumeTestnet" class="text-white">
-    <header id="header" class="fixed w-full z-50 bg-opacity-90 bg-gray-900 backdrop-blur-sm">
+    <header id="header" class="fixed w-full z-50 bg-black/35 backdrop-blur-lg border-b border-white/5">
       <div class="container mx-auto px-6 py-4">
         <div class="flex items-center justify-between">
           <div class="relative flex items-center space-x-2 text-2xl font-semibold text-white">
-            <img src="./images/xylume_transparent.png" alt="Xylume Logo" class="w-24 h-24 -my-8 lg:-ml-10 unselectable"
+            <img src="./images/xylume_transparent.png" alt="Xylume Logo" class="w-16 h-16 -my-8 lg:-ml-10 unselectable"
               draggable="false">
             <span class="hidden sm:inline">Xylume TestNet</span>
           </div>
@@ -191,10 +217,12 @@
             <a href="#features" class="hover:text-blue-500 transition duration-300 cursor-pointer">Features</a>
             <a href="#architecture" class="hover:text-blue-500 transition duration-300 cursor-pointer">Architecture</a>
             <a href="#stats" class="hover:text-blue-500 transition duration-300 cursor-pointer">Stats</a>
-            <a href="docs.html" target="_blank" class="hover:text-blue-500 transition duration-300 cursor-pointer">Documentation</a>
+            <a href="docs.html" target="_blank"
+              class="hover:text-blue-500 transition duration-300 cursor-pointer">Documentation</a>
             <a href="https://debxylen.github.io/XylumeExplorer/" target="_blank"
               class="hover:text-blue-500 transition duration-300 cursor-pointer">Explorer</a>
-            <a href="faucet.html" target="_blank" class="hover:text-blue-500 transition duration-300 cursor-pointer">Faucet</a>
+            <a href="faucet.html" target="_blank"
+              class="hover:text-blue-500 transition duration-300 cursor-pointer">Faucet</a>
             <a href="https://github.com/debxylen/XylumeMiner" target="_blank"
               class="hover:text-blue-500 transition duration-300 cursor-pointer">Miner</a>
           </nav>
@@ -219,212 +247,218 @@
                 class="bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-lg text-lg transition duration-300">
                 Get Started
               </button></a>
-            <a href="docs.html" target="_blank"><button class="border border-blue-600 hover:bg-blue-600/10 px-8 py-3 rounded-lg text-lg transition">
-            Read The Docs
-            </button></a>
+            <a href="docs.html" target="_blank"><button
+                class="border border-blue-600 hover:bg-blue-600/10 px-8 py-3 rounded-lg text-lg transition">
+                Read The Docs
+              </button></a>
           </div>
         </div>
       </div>
     </section>
-    <section id="features" class="py-20">
-      <div class="container mx-auto px-6">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div
-            class="bg-gradient-to-b from-gray-700/50 to-gray-800/50 hover:bg-gray-700/50 transition duration-300 p-8 rounded-xl featurecard">
-            <i class="fa-solid fa-bolt text-3xl text-blue-500 mb-4"></i>
-            <h3 class="text-xl font-bold mb-4">Lightning Fast Transactions</h3>
-            <p class="text-gray-400">With sub-second transaction finalization times, enjoy near-instant transactions
-              without sacrificing security.</p>
+<section id="features" class="py-20">
+  <div class="container mx-auto px-6">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+
+      <!-- Card 1 -->
+      <div class="relative p-8 rounded-xl backdrop-blur-xl bg-[#0f1225]/30 border border-blue-700/30 overflow-hidden featurecard hover:bg-[#0f1225]/50 transition duration-300">
+        <div class="absolute inset-0 bg-gradient-to-tr from-blue-500/10 via-transparent to-blue-300/10 pointer-events-none rounded-xl"></div>
+        <div class="relative z-10">
+          <i class="fa-solid fa-bolt text-3xl text-blue-500 mb-4"></i>
+          <h3 class="text-xl font-bold mb-4">Lightning Fast Transactions</h3>
+          <p class="text-gray-400">With sub-second transaction finalization times, enjoy near-instant transactions without sacrificing security.</p>
+        </div>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="relative p-8 rounded-xl backdrop-blur-xl bg-[#0f1225]/30 border border-blue-700/30 overflow-hidden featurecard hover:bg-[#0f1225]/50 transition duration-300">
+        <div class="absolute inset-0 bg-gradient-to-tr from-blue-500/10 via-transparent to-blue-300/10 pointer-events-none rounded-xl"></div>
+        <div class="relative z-10">
+          <i class="fa-solid fa-coins text-3xl text-blue-500 mb-4"></i>
+          <h3 class="text-xl font-bold mb-4">Dynamic Gas Model</h3>
+          <p class="text-gray-400">Experience efficient, fair, and adaptive gas fees based on network load, ensuring optimal performance while preventing spam.</p>
+        </div>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="relative p-8 rounded-xl backdrop-blur-xl bg-[#0f1225]/30 border border-blue-700/30 overflow-hidden featurecard hover:bg-[#0f1225]/50 transition duration-300">
+        <div class="absolute inset-0 bg-gradient-to-tr from-blue-500/10 via-transparent to-blue-300/10 pointer-events-none rounded-xl"></div>
+        <div class="relative z-10">
+          <i class="fa-solid fa-code text-3xl text-blue-500 mb-4"></i>
+          <h3 class="text-xl font-bold mb-4">Developer Friendly</h3>
+          <p class="text-gray-400">Developer-friendly and EVM-compatible, enabling seamless integration with existing libraries, tools, wallets, and dApps for effortless development and interaction with the Xylume network.</p>
+        </div>
+      </div>
+
+      <!-- Card 4 -->
+      <div class="relative p-8 rounded-xl backdrop-blur-xl bg-[#0f1225]/30 border border-blue-700/30 overflow-hidden featurecard hover:bg-[#0f1225]/50 transition duration-300">
+        <div class="absolute inset-0 bg-gradient-to-tr from-blue-500/10 via-transparent to-blue-300/10 pointer-events-none rounded-xl"></div>
+        <div class="relative z-10">
+          <i class="fa-solid fa-network-wired text-3xl text-blue-500 mb-4"></i>
+          <h3 class="text-xl font-bold mb-4">DAG-based Architecture</h3>
+          <p class="text-gray-400">A Directed Acyclic Graph architecture enhances scalability, security, eliminating bottlenecks found in traditional blockchains by enabling parallel transaction validation.</p>
+        </div>
+      </div>
+
+      <!-- Card 5 -->
+      <div class="relative p-8 rounded-xl backdrop-blur-xl bg-[#0f1225]/30 border border-blue-700/30 overflow-hidden featurecard hover:bg-[#0f1225]/50 transition duration-300">
+        <div class="absolute inset-0 bg-gradient-to-tr from-blue-500/10 via-transparent to-blue-300/10 pointer-events-none rounded-xl"></div>
+        <div class="relative z-10">
+          <i class="fa-solid fa-shield text-3xl text-blue-500 mb-4"></i>
+          <h3 class="text-xl font-bold mb-4">PoUTX Validation</h3>
+          <p class="text-gray-400">Incorporating PoUTX for enhancing transaction validation and integrity, ensuring a highly secure and resilient decentralized network.</p>
+        </div>
+      </div>
+
+      <!-- Card 6 -->
+      <div class="relative p-8 rounded-xl backdrop-blur-xl bg-[#0f1225]/30 border border-blue-700/30 overflow-hidden featurecard hover:bg-[#0f1225]/50 transition duration-300">
+        <div class="absolute inset-0 bg-gradient-to-tr from-blue-500/10 via-transparent to-blue-300/10 pointer-events-none rounded-xl"></div>
+        <div class="relative z-10">
+          <i class="fa-solid fa-shield-alt text-3xl text-blue-500 mb-4"></i>
+          <h3 class="text-xl font-bold mb-4">Attack Resistance</h3>
+          <p class="text-gray-400">Highly resistant to various attacks, such as 51% attacks, Sybil attacks and double-spending. The parent-child transaction relationships ensure that invalid transactions are easily identified and rejected.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+<section id="architecture-carousel" class="relative py-20 bg-gradient-to-b from-gray-900 to-gray-1000 overflow-hidden">
+  <div class="container mx-auto px-6 relative">
+    <div class="relative w-full flex items-center justify-center">
+      <div class="carousel relative w-full">
+        
+        <!-- ghost placeholder for height -->
+        <div id="carousel-ghost" class="invisible md:w-1/3"></div>
+
+        <!-- DAG Structure -->
+        <div class="carousel-card absolute left-1/2 -translate-x-1/2 md:w-1/3 transition-all duration-500 transform scale-90 opacity-50 z-0">
+          <div class="bg-[#1f2233]/80 border border-blue-600/30 backdrop-blur-xl shadow-lg rounded-xl p-8 flex flex-col">
+            <img src="./images/dag.jpg" class="w-full rounded-lg mb-4">
+            <h3 class="text-2xl font-bold mb-2 text-blue-400">DAG Structure</h3>
+            <p class="text-gray-400 text-sm">Xylume TestNet uses a Directed Acyclic Graph (DAG) for parallel, secure transaction validation. Parent-child transaction model ensures efficient processing.</p>
           </div>
-          <div
-            class="bg-gradient-to-b from-gray-700/50 to-gray-800/50 hover:bg-gray-700/50 transition duration-300 p-8 rounded-xl featurecard">
-            <i class="fa-solid fa-coins text-3xl text-blue-500 mb-4"></i>
-            <h3 class="text-xl font-bold mb-4">Dynamic Gas Model</h3>
-            <p class="text-gray-400">Experience efficient, fair, and adaptive gas fees based on network load, ensuring
-              optimal performance while preventing spam.</p>
+        </div>
+
+        <!-- PoUTX -->
+        <div class="carousel-card absolute left-1/2 -translate-x-1/2 md:w-1/3 transition-all duration-500 transform scale-90 opacity-50 z-0">
+          <div class="bg-[#1f2233]/80 border border-blue-600/30 backdrop-blur-xl shadow-lg rounded-xl p-8 flex flex-col">
+            <img src="./images/poutx.jpg" class="w-full rounded-lg mb-4">
+            <h3 class="text-2xl font-bold mb-2 text-blue-400">PoUTX</h3>
+            <p class="text-gray-400 text-sm">Proof of Unspent Transaction eXploration verifies transactions using unspent outputs, prevents double-spending, and enables lightweight state dependencies.</p>
           </div>
-          <div
-            class="bg-gradient-to-b from-gray-700/50 to-gray-800/50 hover:bg-gray-700/50 transition duration-300 p-8 rounded-xl featurecard">
-            <i class="fa-solid fa-code text-3xl text-blue-500 mb-4"></i>
-            <h3 class="text-xl font-bold mb-4">Developer Friendly</h3>
-            <p class="text-gray-400">Developer-friendly and EVM-compatible, enabling seamless integration with existing
-              libraries, tools, wallets, and dApps for effortless development and interaction with the Xylume network.
-            </p>
+        </div>
+
+        <!-- Attack Resistance -->
+        <div class="carousel-card absolute left-1/2 -translate-x-1/2 md:w-1/3 transition-all duration-500 transform scale-90 opacity-50 z-0">
+          <div class="bg-[#1f2233]/80 border border-blue-600/30 backdrop-blur-xl shadow-lg rounded-xl p-8 flex flex-col">
+            <img src="./images/shield.jpg" class="w-full rounded-lg mb-4">
+            <h3 class="text-2xl font-bold mb-2 text-blue-400">Attack Resistance</h3>
+            <p class="text-gray-400 text-sm">Resistant to 51%, Sybil, and double-spending attacks. DAG + PoUTX ensures no single entity controls the network and invalid transactions are blocked.</p>
           </div>
-          <div
-            class="bg-gradient-to-b from-gray-700/50 to-gray-800/50 hover:bg-gray-700/50 transition duration-300 p-8 rounded-xl featurecard">
-            <i class="fa-solid fa-network-wired text-3xl text-blue-500 mb-4"></i>
-            <h3 class="text-xl font-bold mb-4">DAG-based Architecture</h3>
-            <p class="text-gray-400">A Directed Acyclic Graph architecture enhances scalability, security, eliminating
-              bottlenecks found in traditional blockchains by enabling parallel transaction validation.</p>
+        </div>
+
+        <!-- Decentralization -->
+        <div class="carousel-card absolute left-1/2 -translate-x-1/2 md:w-1/3 transition-all duration-500 transform scale-90 opacity-50 z-0">
+          <div class="bg-[#1f2233]/80 border border-blue-600/30 backdrop-blur-xl shadow-lg rounded-xl p-8 flex flex-col">
+            <img src="./images/p2p.png" class="w-full rounded-lg mb-4">
+            <h3 class="text-2xl font-bold mb-2 text-blue-400">Decentralization</h3>
+            <p class="text-gray-400 text-sm">P2P node system with socket-based connections and auto-maintained healthy node list ensures distributed consensus and network resilience.</p>
           </div>
-          <div
-            class="bg-gradient-to-b from-gray-700/50 to-gray-800/50 hover:bg-gray-700/50 transition duration-300 p-8 rounded-xl featurecard">
-            <i class="fa-solid fa-shield text-3xl text-blue-500 mb-4"></i>
-            <h3 class="text-xl font-bold mb-4">PoUTX Validation</h3>
-            <p class="text-gray-400">Incorporating PoUTX for enhancing transaction validation and integrity, ensuring a
-              highly secure and resilient decentralized network.</p>
+        </div>
+
+        <!-- Security -->
+        <div class="carousel-card absolute left-1/2 -translate-x-1/2 md:w-1/3 transition-all duration-500 transform scale-90 opacity-50 z-0">
+          <div class="bg-[#1f2233]/80 border border-blue-600/30 backdrop-blur-xl shadow-lg rounded-xl p-8 flex flex-col">
+            <img src="./images/security.jpg" class="w-full rounded-lg mb-4">
+            <h3 class="text-2xl font-bold mb-2 text-blue-400">Security</h3>
+            <p class="text-gray-400 text-sm">Cryptography + PoUTX ensures transaction integrity and authenticity. BLAKE2b hashing provides high-speed, secure performance.</p>
           </div>
-          <div
-            class="bg-gradient-to-b from-gray-700/50 to-gray-800/50 hover:bg-gray-700/50 transition duration-300 p-8 rounded-xl featurecard">
-            <i class="fa-solid fa-shield-alt text-3xl text-blue-500 mb-4"></i>
-            <h3 class="text-xl font-bold mb-4">Attack Resistance</h3>
-            <p class="text-gray-400">Highly resistant to various attacks, such as 51% attacks, Sybil attacks and
-              double-spending. The parent-child transaction relationships ensure that invalid transactions are easily
-              identified and rejected.</p>
+        </div>
+
+        <!-- Gas & Tokenomics -->
+        <div class="carousel-card absolute left-1/2 -translate-x-1/2 md:w-1/3 transition-all duration-500 transform scale-90 opacity-50 z-0">
+          <div class="bg-[#1f2233]/80 border border-blue-600/30 backdrop-blur-xl shadow-lg rounded-xl p-8 flex flex-col">
+            <img src="./images/gas.jpg" class="w-full rounded-lg mb-4">
+            <h3 class="text-2xl font-bold mb-2 text-blue-400">Gas & Tokenomics</h3>
+            <p class="text-gray-400 text-sm">Dynamic gas model with XYL tokens, adjustable base fee, and initial supply of 6,942,340 XYL ensures fair network participation.</p>
           </div>
         </div>
       </div>
-    </section>
-    <section id="architecture">
-      <div class="p-20 bg-gradient-to-b from-gray-900 to-gray-1000 mx-20 my-10 rounded-lg">
-        <div class="flex flex-col md:flex-row items-center justify-between">
-          <div class="md:w-1/2 mx-5 mb-10 md:mb-0">
-            <h1 class="text-5xl font-bold mb-6">DAG Structure</h1>
-            <p class="text-gray-400 mb-2 indent-4 md:indent-8">
-              Xylume TestNet uses a <b>Directed Acyclic Graph (DAG)</b> instead of a traditional blockchain, allowing
-              for simultaneous, secure transaction validation.
-              This design eliminates bottlenecks from sequential block production, enabling faster processing and better
-              scalability as the network grows.
-            </p>
-            <p class="text-gray-400 mb-2 indent-4 md:indent-8">
-              The network follows a <b>parent-child relationship</b> model, where transactions link together
-              hierarchically.
-              Each parent's unspent output, or <b>'juice'</b>, is used by the child transactions, ensuring efficient
-              validation and eliminating redundant steps.
-              This structure enhances network scalability and performance.
-            </p>
-          </div>
-          <div class="md:w-1/2">
-            <img src="./images/dag.jpg" class="w-full rounded-lg">
-          </div>
-        </div>
-      </div>
-      <div class="p-20 bg-gradient-to-b from-gray-900 to-gray-1000 mx-20 my-10 rounded-lg">
-        <div class="flex flex-col md:flex-row items-center justify-between">
-          <div class="md:w-1/2">
-            <img src="./images/poutx.jpg" class="w-full rounded-lg">
-          </div>
-          <div class="md:w-1/2 mx-5 mb-10 md:mb-0">
-            <h1 class="text-5xl font-bold mb-6">PoUTX</h1>
-            <p class="text-gray-400 mb-2 indent-4 md:indent-8">
-              Xylume TestNet implements <b>Proof of Unspent Transaction eXploration (PoUTX)</b> as its validation
-              mechanism and 'mining'.
-              This approach uses Unspent Transaction Outputs (UTXO) to verify transactions. In PoUTX, miners find valid
-              transactions with sufficient unspent outputs (juice)
-              for the new transaction and submit them to the node, which validates the authenticity of the mined job.
-            </p>
-            <p class="text-gray-400 mb-2 indent-4 md:indent-8">
-              This ensures that no funds are double-spent, a series of valid transactions is formed representing the
-              flow of the coins, and that the transactions are legitimate,
-              thereby maintaining network security.
-              PoUTX also facilitates a lightweight <b>state dependency system</b>, where each transaction only relies on
-              the state of its direct parent transaction,
-              making the network more efficient and resistant to attacks.
-            </p>
-          </div>
-        </div>
-      </div>
-      <div class="p-20 bg-gradient-to-b from-gray-900 to-gray-1000 mx-20 my-10 rounded-lg">
-        <div class="flex flex-col md:flex-row items-center justify-between">
-          <div class="md:w-1/2 mb-10 mx-5 md:mb-0">
-            <h1 class="text-5xl font-bold mb-6">Attack Resistance</h1>
-            <p class="text-gray-400 mb-2 indent-4 md:indent-8">
-              Xylume TestNet is highly resistant to <b>51% attacks, Sybil attacks,</b> and <b>double-spending</b>.
-              Its <b>DAG structure</b> and <b>PoUTX consensus</b> ensure no single entity can control the network, while
-              parent-child validation prevents invalid transactions from being accepted.
-            </p>
-            <p class="text-gray-400 mb-2">
-              Security is enforced through multiple mechanisms: <br>
-              &emsp;&emsp;• <b>DAG-based validation</b> prevents network reorganization, <br>
-              &emsp;&emsp;• the <b>juice rule</b> blocks conflicting transactions, <br>
-              &emsp;&emsp;• a <b>dynamic gas model</b> discourages spam, <br>
-              &emsp;&emsp;• <b>strict peer validation</b> makes Sybil attacks harder to execute.<br>
-            </p>
-          </div>
-          <div class="md:w-1/2">
-            <img src="./images/shield.jpg" class="w-full rounded-lg">
-          </div>
-        </div>
-      </div>
-      <div class="p-20 bg-gradient-to-b from-gray-900 to-gray-1000 mx-20 my-10 rounded-lg">
-        <div class="flex flex-col md:flex-row items-center justify-between">
-          <div class="md:w-1/2">
-            <img src="./images/p2p.png" class="w-full rounded-lg">
-          </div>
-          <div class="md:w-1/2 mb-10 mx-5 md:mb-0">
-            <h1 class="text-5xl font-bold mb-6">Decentralization</h1>
-            <p class="text-gray-400 mb-2 indent-4 md:indent-8">
-              Xylume TestNet achieves decentralization through a <b>P2P node system</b>, where nodes communicate via
-              <b>socket-based connections</b>.
-              New nodes initiate connections by listening to active nodes, which connect back to establish a two-way
-              link.
-              Nodes are discovered through an official, auto-maintained list that ensures only healthy nodes
-              participate, optimizing network performance.
-            </p>
-            <p class="text-gray-400 mb-2 indent-4 md:indent-8">
-              The network operates on <b>distributed consensus</b>, with all nodes validating transactions via the
-              <b>PoUTX mechanism</b>.
-              Each mined transaction is broadcasted and revalidated by connected nodes. If a majority confirm its
-              validity, it is permanently added to the source node’s DAG, ensuring security and decentralization.
-            </p>
-          </div>
-        </div>
-      </div>
-      <div class="p-20 bg-gradient-to-b from-gray-900 to-gray-1000 mx-20 my-10 rounded-lg">
-        <div class="flex flex-col md:flex-row items-center justify-between">
-          <div class="md:w-1/2 mx-5 mb-10 md:mb-0">
-            <h1 class="text-5xl font-bold mb-6">Security</h1>
-            <p class="text-gray-400 mb-2 indent-4 md:indent-8">
-              Xylume TestNet leverages <b>cryptographic techniques</b> to ensure the integrity of transactions. Each
-              transaction is digitally signed using the sender's private key, ensuring authenticity.
-              Furthermore, PoUTX prevents double-spending by requiring proof of unspent outputs before any new
-              transaction can be added to the network.
-            </p>
-            <p class="text-gray-400 mb-2">
-              To enhance security and efficiency, Xylume TestNet employs <b>BLAKE2b</b> as its primary hashing algorithm
-              for its <b>high-speed</b> performance,
-              strong <b>cryptographic resistance</b>, and reduced computational overhead compared to other cryptographic
-              hash functions like SHA-256.
-            </p>
-          </div>
-          <div class="md:w-1/2">
-            <img src="./images/security.jpg" class="w-full rounded-lg">
-          </div>
-        </div>
-      </div>
-      <div class="p-20 bg-gradient-to-b from-gray-900 to-gray-1000 mx-20 my-10 rounded-lg">
-        <div class="flex flex-col md:flex-row items-center justify-between">
-          <div class="md:w-1/2">
-            <img src="./images/gas.jpg" class="w-full rounded-lg">
-          </div>
-          <div class="md:w-1/2 mb-10 mx-5 md:mb-0">
-            <h1 class="text-5xl font-bold mb-6">Gas and Tokenomics</h1>
-            <p class="text-gray-400 mb-2 indent-4 md:indent-8">
-              Xylume TestNet incorporates a <b>dynamic gas model</b> to encourage efficient use of the network and
-              fairly reward nodes and miners for their participation in the validation process.
-              Each transaction consumes gas, which is paid in native Xylume (XYL) tokens.
-            </p>
-            <p class="text-gray-400 mb-2">
-              The <b>base gas</b> is calculated according to the network load:
-              <br>&emsp;&emsp;• Base fee in XYL = 0.000069 + (0.000069 * (Current incoming TPS / 10000))
-              <br>The incoming TPS is calculated as the number of pending transactions divided by the time difference
-              between the oldest and newest pending transactions.
-            </p>
-            <p class="text-gray-400 mb-2 indent-4 md:indent-8">
-              The initial supply of XYL is <b>6,942,340 XYL</b>. The smallest unit of the native token is <b>wxei</b>,
-              which is equal to <b>1e-18</b> of a XYL, thus the decimals of the XYL token are 18, similar to that of
-              Ether.
-            </p>
-          </div>
-        </div>
-      </div>
-    </section>
+
+      <!-- Arrows -->
+      <button id="prev" class="absolute left-0 text-white text-4xl px-4 z-20">‹</button>
+      <button id="next" class="absolute right-0 text-white text-4xl px-4 z-20">›</button>
+    </div>
+  </div>
+</section>
+<script>
+const cards = Array.from(document.querySelectorAll('.carousel-card'));
+let centerIndex = 0;
+
+function renderCarousel() {
+  const containerHeight = Math.max(...cards.map(c => c.offsetHeight));
+  document.querySelector('.carousel').style.height = containerHeight + 'px';
+
+  const isMobile = window.innerWidth < 768; // adjust breakpoint as needed
+
+  cards.forEach((card, i) => {
+    let offset = i - centerIndex;
+
+    // wrap offsets cyclically
+    if (offset < -Math.floor(cards.length / 2)) offset += cards.length;
+    if (offset > Math.floor(cards.length / 2)) offset -= cards.length;
+
+    card.style.transition = 'all 0.5s ease';
+
+    if (offset === 0) {
+      card.style.transform = 'translateX(-50%) scale(1)';
+      card.style.opacity = '1';
+      card.style.zIndex = '10';
+    } else if (offset === -1) {
+      if (isMobile) {
+        card.style.transform = 'translateX(-60%) scale(0.9)'; // less offset, peek
+        card.style.opacity = '0.5';
+      } else {
+        card.style.transform = 'translateX(-150%) scale(0.9)';
+        card.style.opacity = '0.5';
+      }
+      card.style.zIndex = '5';
+    } else if (offset === 1) {
+      if (isMobile) {
+        card.style.transform = 'translateX(-40%) scale(0.9)'; // peek on right
+        card.style.opacity = '0.5';
+      } else {
+        card.style.transform = 'translateX(50%) scale(0.9)';
+        card.style.opacity = '0.5';
+      }
+      card.style.zIndex = '5';
+    } else {
+      card.style.transform = 'translateX(-50%) scale(0.8)';
+      card.style.opacity = '0';
+      card.style.zIndex = '0';
+    }
+  });
+}
+
+document.getElementById('next').onclick = () => {
+  centerIndex = (centerIndex + 1) % cards.length;
+  renderCarousel();
+};
+
+document.getElementById('prev').onclick = () => {
+  centerIndex = (centerIndex - 1 + cards.length) % cards.length;
+  renderCarousel();
+};
+
+window.addEventListener('resize', renderCarousel);
+window.addEventListener('load', renderCarousel);
+</script>
+
     <section id="stats" class="py-20 bg-gradient-to-b from-gray-800/50 to-gray-900/50">
       <div class="container mx-auto px-6">
         <div class="grid overflow-hidden grid-cols-2 md:grid-cols-4 gap-8 text-center h-[15vh]">
           <div>
-            <div class="text-4xl hover:text-5xl transition-all duration-500 font-bold text-blue-500 mb-2">0.15s</div>
+            <div class="text-4xl hover:text-5xl transition-all duration-500 font-bold text-blue-500 mb-2">0.05s</div>
             <div class="text-gray-400">Average TX Confirmation Time <br><span class="text-gray-600 text-sm">*Under ideal
                 network latency and load</span></div>
           </div>
@@ -462,14 +496,18 @@
               </button>
             </a>
             <a href="docs.html" target="_blank">
-            <button class="bg-white text-blue-900 hover:scale-105 hover:bg-gray-100 px-8 py-3 rounded-lg text-lg transition duration-300">
-            View Documentation
-            </button>
+              <button
+                class="bg-white text-blue-900 hover:scale-105 hover:bg-gray-100 px-8 py-3 rounded-lg text-lg transition duration-300">
+                View Documentation
+              </button>
             </a>
           </div>
         </div>
       </div>
     </section>
+
+    
+
     <footer id="footer" class="bg-gradient-to-b from-gray-900/50 to-black pt-12 pb-5 ">
       <div class="container mx-auto px-4 pt-12 pb-5">
         <div class="grid md:grid-cols-4 gap-8">
@@ -500,7 +538,7 @@
           <div>
             <h4 class="text-lg font-bold mb-4">Community</h4>
             <ul class="space-y-2 text-gray-400">
-              <a href="https://discord.gg/csDr2zwyd9" target="_blank">
+              <a href="https://discord.gg/jXq9AB9qeW" target="_blank">
                 <li><span class="hover:text-blue-500 transition duration-300 cursor-pointer">Discord</span></li>
               </a>
             </ul>
