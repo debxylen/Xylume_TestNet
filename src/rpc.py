@@ -102,11 +102,12 @@ class RPC(Flask):
             return {'jsonrpc': '2.0', 'error':  {'code': 3469, 'message': "Error 3469: Gas? Time? Luck? The universe isn’t sure, but something went sideways."}, 'id': data.get('id')}
 
     def handle_get_block_by_number(self, data):
+        tx = None
         if 'latest' in data.get('params')[0]:
             block_number = len(self.core.dag.nodes) - 1
         else:
             block_number = int(data.get('params')[0], 16)
-            tx = self.core.get_tx_by_number(block_number)
+        tx = self.core.get_tx_by_number(block_number)
         if not tx:
             return {'jsonrpc': '2.0', 'result': None, 'id': data.get('id')}
         tx = self.core.dag.tx_to_block(tx)
@@ -117,11 +118,12 @@ class RPC(Flask):
             return {'jsonrpc': '2.0', 'result': None, 'id': data.get('id')}
 
     def handle_get_tx_by_number(self, data):
+        tx = None
         if 'latest' in data.get('params')[0]:
             block_number = len(self.core.dag.nodes) - 1
         else:
             block_number = int(data.get('params')[0], 16)
-            tx = self.core.get_tx_by_number(block_number)
+        tx = self.core.get_tx_by_number(block_number)
         if not tx:
             return {'jsonrpc': '2.0', 'result': None, 'id': data.get('id')}
         tx = tx.__json__()

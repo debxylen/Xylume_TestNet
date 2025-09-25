@@ -101,9 +101,12 @@ class Core:
             for i in nodes_to_remove:
                 self.dag.remove_node(i)
 
-    def get_balance(self, address, mode = 'latest'):
+    def get_balance(self, address, mode='latest'):
         address = address.lower()
-        with self.dag_lock.gen_rlock(): nodes_snapshot = list(self.dag.nodes.values())
+
+        # Confirmed balance from DAG
+        with self.dag_lock.gen_rlock():
+            nodes_snapshot = list(self.dag.nodes.values())
         confirmed_balance = sum(
             tx.juice for node in nodes_snapshot
             if (tx := node.get("transaction"))
@@ -111,28 +114,76 @@ class Core:
             and tx.juice > 0
         )
 
-        if mode == 'latest': return confirmed_balance
+        if mode == 'latest':
+            return confirmed_balance
 
-        with self.mempool_lock.gen_rlock(): 
-            mempool_balance = (
-                sum(tx.amount for tx in self.mempool if tx.recipient == address)
-                - sum(tx.amount + tx.gas for tx in self.mempool if tx.sender == address)
-            )
-        return confirmed_balance + mempool_balance
+        pending_in = 0
+        pending_out = 0
 
-    def get_transaction_count(self, sender_address, mode = 'latest'):
-        """Counts the number of transactions in the DAG with a specific sender address."""
-        with self.dag_lock.gen_rlock(): nodes_snapshot = list(self.dag.nodes.values())
-        count = sum(
-            1 for node in nodes_snapshot
-            if (tx := node.get("transaction"))
-            and tx.sender == sender_address.lower()
-        )
-        if mode.lower() == 'latest': return count # stop, dont count pending if mode is latest
+        # Include mempool
         with self.mempool_lock.gen_rlock():
-            for pending_tx in self.mempool:
-                if pending_tx.sender == sender_address.lower():
-                    count += 1
+            mempool_snapshot = list(self.mempool)
+        for tx in mempool_snapshot:
+            if tx.recipient == address:
+                pending_in += tx.amount
+            if tx.sender == address:
+                pending_out += tx.amount + tx.gas
+
+        # Include picked
+        with self.picked_lock.gen_rlock():
+            picked_snapshot = list(self.picked)
+        for tx in picked_snapshot:
+            if tx.recipient == address:
+                pending_in += tx.amount
+            if tx.sender == address:
+                pending_out += tx.amount + tx.gas
+
+        # Include funnel
+        with self.funnel_lock.gen_rlock():
+            funnel_snapshot = list(self.funnel)
+        for tx in funnel_snapshot:
+            if tx.recipient == address:
+                pending_in += tx.amount
+            if tx.sender == address:
+                pending_out += tx.amount + tx.gas
+
+        return confirmed_balance + pending_in - pending_out
+
+    def get_transaction_count(self, sender_address, mode='latest'):
+        sender_address = sender_address.lower()
+        count = 0
+
+        # Confirmed transactions from DAG
+        with self.dag_lock.gen_rlock():
+            nodes_snapshot = list(self.dag.nodes.values())
+        for node in nodes_snapshot:
+            if (tx := node.get("transaction")) and tx.sender.lower() == sender_address:
+                count += 1
+
+        if mode.lower() == 'latest':
+            return count
+
+        # Include mempool
+        with self.mempool_lock.gen_rlock():
+            mempool_snapshot = list(self.mempool)
+        for tx in mempool_snapshot:
+            if tx.sender.lower() == sender_address:
+                count += 1
+
+        # Include picked
+        with self.picked_lock.gen_rlock():
+            picked_snapshot = list(self.picked)
+        for tx in picked_snapshot:
+            if tx.sender.lower() == sender_address:
+                count += 1
+
+        # Include funnel
+        with self.funnel_lock.gen_rlock():
+            funnel_snapshot = list(self.funnel)
+        for tx in funnel_snapshot:
+            if tx.sender.lower() == sender_address:
+                count += 1
+
         return count
 
     def get_tx_by_number(self, n: int):
