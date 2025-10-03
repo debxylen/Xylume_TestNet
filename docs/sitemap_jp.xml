@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset 
+  xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml">
+
+  <!-- JP homepage -->
+  <url>
+    <loc>https://debxylen.github.io/Xylume_TestNet/jp.html</loc>
+    <xhtml:link 
+      rel="alternate" 
+      hreflang="en" 
+      href="https://debxylen.github.io/Xylume_TestNet/index.html"/>
+    <lastmod>2025-10-03</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+
+  <!-- Docs -->
+  <url>
+    <loc>https://debxylen.github.io/Xylume_TestNet/docs.html</loc>
+    <xhtml:link 
+      rel="alternate" 
+      hreflang="en" 
+      href="https://debxylen.github.io/Xylume_TestNet/docs.html"/>
+    <lastmod>2025-09-30</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- External links -->
+  <url>
+    <loc>https://debxylen.github.io/XylumeExplorer/</loc>
+    <lastmod>2025-10-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://xylume-faucet.vercel.app/</loc>
+    <lastmod>2025-10-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://github.com/debxylen/XylumeMiner</loc>
+    <lastmod>2025-10-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+</urlset>
