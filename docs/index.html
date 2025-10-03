@@ -12,7 +12,7 @@
   <meta name="description"
     content="Explore Xylume TestNet, a next-gen decentralized Layer 1 platform and protocol optimized for high throughput, scalability, and performance, enabling low-cost, sub-second transactions with strong security and efficiency.">
   <meta name="keywords"
-    content="Xylume TestNet, XYL TestNet, Directed Acyclic Graph, UTXO, PoUTX, DAG, Cryptocurrency, Next-Generation, High-Performance, Decentralized Network, Fast Transactions, Scalable Blockchain, Dynamic Gas Pricing, EVM Compatibility, Ethereum TestNet, Smart Contracts, Blockchain Security, Cryptocurrency Testing, Decentralized Ecosystem, Blockchain, XYL Blockchain, XYL Mainnet, Blockchain Development, Transaction Validation, Blockchain Miner, XYL Gas Model, XYL Explorer">
+    content="Xylume TestNet, XYL TestNet, Directed Acyclic Graph, UTXO, DAG, Cryptocurrency, Next-Generation, High-Performance, Decentralized Network, Fast Transactions, Scalable Blockchain, Dynamic Gas Pricing, EVM Compatibility, Ethereum TestNet, Smart Contracts, Blockchain Security, Cryptocurrency Testing, Decentralized Ecosystem, Blockchain, XYL Blockchain, XYL Mainnet, Blockchain Development, Transaction Validation, Blockchain Miner, XYL Gas Model, XYL Explorer">
   <meta property="og:title" content="Xylume TestNet">
   <meta property="og:description"
     content="Explore Xylume TestNet, a next-gen decentralized Layer 1 platform and protocol optimized for high throughput, scalability, and performance, enabling low-cost, sub-second transactions with strong security and efficiency.">
@@ -26,11 +26,11 @@
         "name": "Xylume TestNet",
         "url": "https://debxylen.github.io/Xylume_TestNet/",
         "description": "Explore Xylume TestNet, a next-gen decentralized Layer 1 platform and protocol optimized for high throughput, scalability, and performance, enabling low-cost, sub-second transactions with strong security and efficiency.",
-        "keywords": "Xylume TestNet, XYL TestNet, Directed Acyclic Graph, UTXO, PoUTX, DAG, Cryptocurrency, Next-Generation, High-Performance, Decentralized Network, Fast Transactions, Scalable Blockchain, Dynamic Gas Pricing, PoUTX, EVM Compatibility, Ethereum TestNet, Smart Contracts, Blockchain Security, Cryptocurrency Testing, Decentralized Ecosystem, Blockchain, XYL Blockchain, XYL Mainnet, Blockchain Development, Transaction Validation, Blockchain Miner, XYL Gas Model, XYL Explorer"
+        "keywords": "Xylume TestNet, XYL TestNet, Directed Acyclic Graph, UTXO, DAG, Cryptocurrency, Next-Generation, High-Performance, Decentralized Network, Fast Transactions, Scalable Blockchain, Dynamic Gas Pricing, EVM Compatibility, Ethereum TestNet, Smart Contracts, Blockchain Security, Cryptocurrency Testing, Decentralized Ecosystem, Blockchain, XYL Blockchain, XYL Mainnet, Blockchain Development, Transaction Validation, Blockchain Miner, XYL Gas Model, XYL Explorer"
       }
     </script>
   </script>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins&family=Michroma" rel="stylesheet" />
   <script>
     if (console && console.warn) {
       const originalWarn = console.warn;
@@ -46,22 +46,30 @@
       const loader = document.getElementById("loaderOverlay");
       loader.style.opacity = 0;
       setTimeout(() => loader.remove(), 500);
-      const elements = document.querySelectorAll("div:not(#xylumeTestnet):not(#loaderOverlay):not(.loader-content):not(#bg-el):not(#architecture-carousel):not(.carousel-card)");
+      const elements = document.querySelectorAll("div:not(#xylumeTestnet):not(#loaderOverlay):not(.loader-content):not(#bg-el):not(#arch-content-container *)");
 
-      const observer = new IntersectionObserver((entries, observer) => {
+      const observer1 = new IntersectionObserver((entries, observer1) => {
         entries.forEach(entry => {
           if (entry.isIntersecting) {
             entry.target.style.opacity = "1";
             entry.target.style.transform = "translateY(0)";
-          } else {
+          }
+        });
+      }, { threshold: 0.15 });
+
+      elements.forEach(el => observer1.observe(el));
+
+      const observer2 = new IntersectionObserver((entries, observer2) => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) {
+            entry.target.style.opacity = "0";
             entry.target.style.transform = "translateY(-20px)";
           }
         });
-      }, { threshold: 0.2 });
+      }, { threshold: 0.1 });
 
-      elements.forEach(el => observer.observe(el));
+      elements.forEach(el => observer2.observe(el));
     });
-
 
   </script>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -70,6 +78,10 @@
   <style>
     #xylumeTestnet {
       visibility: hidden;
+    }
+
+    html {
+      scroll-padding-top: 20vh;
     }
 
     body {
@@ -95,20 +107,23 @@
       -ms-user-select: none;
     }
 
-    div:not(#architecture-carousel):not(#xylumeTestnet):not(#loaderOverlay):not(.loader-content):not(#bg-el) {
+    div:not(#xylumeTestnet):not(#loaderOverlay):not(.loader-content):not(#bg-el):not(#arch-content-container *) {
       opacity: 0;
       transform: translateY(20px);
       transition: opacity 0.5s ease-out, transform 0.5s ease-out;
     }
 
-.carousel-card {
-  transition: all 0.5s ease;
-  position: absolute; /* default */
-}
-.carousel-card.active {
-  position: relative; /* stays in flow */
-  margin: 0 auto;
-}
+    .carousel-card {
+      transition: all 0.5s ease;
+      position: absolute;
+      /* default */
+    }
+
+    .carousel-card.active {
+      position: relative;
+      /* stays in flow */
+      margin: 0 auto;
+    }
 
     #header,
     #header *,
@@ -158,7 +173,7 @@
       transition: opacity 0.5s ease;
     }
 
-     .loader-content {
+    .loader-content {
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -172,26 +187,87 @@
         transform: rotate(360deg);
       }
     }
-/* Tailwind example */
-.carousel-card {
-  width: 80%; /* main card */
-  left: 50%;
-  transform: translateX(-50%) scale(1);
-}
 
-@media(min-width: 768px){
-  .carousel-card { width: 45%; } /* tablet */
-}
-@media(min-width: 1024px){
-  .carousel-card { width: 33%; } /* desktop */
-}
+    @media(max-width: 768px) {
+      *:not(#speed-visual *) {
+        margin: 0 auto;
+        text-align: center;
+      }
 
+      /* mobile */
+    }
+
+    .rings circle {
+      transform-origin: 300px 300px;
+      /* center of the svg */
+      animation: rotate 20s linear infinite;
+    }
+
+    .rings circle:nth-child(2) {
+      animation-duration: 40s;
+      /* slower */
+      animation-direction: reverse;
+      /* opposite spin */
+    }
+
+    .rings circle:nth-child(3) {
+      animation-duration: 60s;
+      /* slowest */
+    }
+
+    @keyframes rotate {
+      from {
+        transform: rotate(0deg);
+      }
+
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* flowing current along links using dash offset trick for illusion */
+    .links line {
+      stroke-dasharray: 400;
+      stroke-dashoffset: 400;
+      animation: flow 2s linear infinite;
+    }
+
+    @keyframes flow {
+      to {
+        stroke-dashoffset: -400;
+      }
+    }
+
+    @keyframes ticker {
+      from {
+        transform: translateX(0);
+      }
+
+      to {
+        transform: translateX(-50%);
+      }
+    }
+
+    /* ticker going right instead of left */
+    .tickerL {
+      animation: ticker 30s linear infinite;
+    }
+
+    .tickerR {
+      animation: ticker 38s linear infinite reverse;
+      /* <- this is the opposite direction */
+    }
+
+    .animated-nav-item {
+      transition: opacity 0.3s ease-in-out;
+    }
   </style>
 </head>
 
-<body class="h-full w-full text-base-content">
+<body class="h-full w-full text-[#e7ecff]">
+
   <div id="loaderOverlay">
-    <div class="loader-content hidden">
+    <div class="loader-content">
       <svg xmlns="http://www.w3.org/2000/svg" style="animation: spin 1s linear infinite; opacity: 1;" width="64"
         height="64" viewBox="0 0 32 32">
         <path fill="#3b82f6"
@@ -202,323 +278,377 @@
 
   <div class="absolute inset-0 w-screen h-screen bg-gradient-to-br from-[#08101A] to-black -z-10" id="bg-el">
     <img src="./images/bg.jpeg" class="w-full h-full">
+    <div class="absolute inset-0 w-screen h-screen backdrop-blur-sm -z-9" id="bg-el-blur"></div>
   </div>
-  <div id="xylumeTestnet" class="text-white">
-    <header id="header" 
-  class="fixed w-full z-50 backdrop-blur-lg" 
-  style="background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0));">
-      <div class="container mx-auto px-6 py-4">
-        <div class="flex items-center justify-between">
-          <div class="relative flex items-center space-x-2 text-2xl font-semibold text-white">
-            <img src="./images/xylume_transparent.png" alt="Xylume Logo" class="w-16 h-16 -my-8 lg:-ml-10 unselectable"
-              draggable="false">
-            <span class="hidden sm:inline">Xylume TestNet</span>
+
+  <header id="header" class="fixed top-4 z-50 w-full transition-all duration-500">
+    <nav class="max-w-[88rem] mx-auto px-6">
+      <div
+        class="flex items-center justify-between py-4 px-6 rounded-3xl backdrop-blur-xl shadow-2xl bg-[#1f2233]/45 transition-colors duration-300">
+
+        <a href="./" class="flex items-center space-x-2 text-white hover:text-blue-400 transition flex-shrink-0">
+          <img src="./images/xylume_transparent.png" alt="Xylume Logo" class="h-8 w-auto">
+          <span class="text-xl font-extrabold hidden sm:block">Xylume TestNet</span>
+        </a>
+
+        <div class="hidden lg:flex items-center space-x-12 relative" id="navArea">
+
+          <div id="linkWrapper" class="relative h-6" style="min-width: 600px;">
+
+            <div id="mainNav"
+              class="absolute inset-0 flex items-center justify-center space-x-8 text-lg font-medium transition-all duration-300 opacity-100 pointer-events-auto">
+
+              <a href="#speed" class="animated-nav-item opacity-100 hover:text-blue-400">Stats</a>
+              <a href="#features" class="animated-nav-item opacity-100 hover:text-blue-400">Features</a>
+              <a href="#architecture" class="animated-nav-item opacity-100 hover:text-blue-400">Architecture</a>
+
+              <button id="ecosystemButton"
+                class="animated-nav-item opacity-100 hover:text-blue-400 text-lg font-medium flex items-center space-x-1 cursor-pointer">
+                <span>Ecosystem</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+            </div>
+
+            <div id="ecosystemNav"
+              class="absolute inset-0 flex items-center justify-center space-x-8 text-lg font-medium opacity-0 invisible pointer-events-none transition-all duration-300">
+              <a href="https://debxylen.github.io/XylumeExplorer/" target="_blank"
+                class="animated-nav-item opacity-0 hover:text-blue-400">Explorer</a>
+              <a href="https://xylume-faucet.vercel.app/" target="_blank"
+                class="animated-nav-item opacity-0 hover:text-blue-400">Faucet</a>
+              <a href="https://github.com/debxylen/XylumeMiner" target="_blank"
+                class="animated-nav-item opacity-0 hover:text-blue-400">Miner</a>
+              <a href="./docs.html" target="_blank" class="animated-nav-item opacity-0 hover:text-blue-400">Docs</a>
+            </div>
           </div>
-          <nav class="hidden lg:flex space-x-8">
-            <a href="/Xylume_TestNet/" class="hover:text-blue-500 transition duration-300 cursor-pointer">Home</a>
-            <a href="#features" class="hover:text-blue-500 transition duration-300 cursor-pointer">Features</a>
-            <a href="#architecture" class="hover:text-blue-500 transition duration-300 cursor-pointer">Architecture</a>
-            <a href="#stats" class="hover:text-blue-500 transition duration-300 cursor-pointer">Stats</a>
-            <a href="docs.html" target="_blank"
-              class="hover:text-blue-500 transition duration-300 cursor-pointer">Documentation</a>
-            <a href="https://debxylen.github.io/XylumeExplorer/" target="_blank"
-              class="hover:text-blue-500 transition duration-300 cursor-pointer">Explorer</a>
-            <a href="faucet.html" target="_blank"
-              class="hover:text-blue-500 transition duration-300 cursor-pointer">Faucet</a>
-            <a href="https://github.com/debxylen/XylumeMiner" target="_blank"
-              class="hover:text-blue-500 transition duration-300 cursor-pointer">Miner</a>
-          </nav>
-          <a href="#cta"><button class="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg transition duration-300">
-              Connect
-            </button></a>
         </div>
+        <a href="#cta"
+          class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition duration-300 shadow-lg shadow-blue-500/50 flex-shrink-0">
+          Get Started
+        </a>
       </div>
-    </header>
-    <section id="hero" class="h-[100vh] flex items-center">
-      <div class="container mx-auto px-6">
-        <div class="max-w-3xl">
-          <h1 class="text-5xl md:text-6xl font-bold mb-6">
-            Experience The Power of<br><span class="text-blue-500">Xylume TestNet</span><br>
+    </nav>
+  </header>
+
+  <div id="xylumeTestnet" class="relative">
+
+    <section id="hero" class="max-w-[76rem] h-[115vh] lg:h-[100vh] mx-auto flex items-center">
+      <div
+        class="container mx-auto px-6 grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-4 items-center lg:justify-center">
+
+        <div
+          class="text-center lg:text-left max-w-7xl mx-auto max-h-full flex flex-col items-center lg:items-start gap-[34px] md:gap-0">
+          <h1
+            class="text-[clamp(36px,6vw,86px)] leading-[1.04] mb-[18px] tracking-[-0.02em] m-0 flex flex-col items-center lg:items-start">
+            Layer‑1 for the Next Era
+            <span class="text-[0.5em] tracking-[0.06em] pt-[10px] md:pt-0 md:mt-[10px] font-[Michroma] text-blue-500">
+              Xylume TestNet
+            </span>
           </h1>
-          <p class="text-xl text-gray-400 mb-8">
+
+          <p class="text-[clamp(16px,1.6vw,20px)] text-[#9aa3c7] max-w-[60ch]">
             Enjoy Lightning-Fast Transactions, Ultra-Low Fees, High Throughput, and EVM Compatibility for a seamless
             experience.
           </p>
-          <div class="flex space-x-4">
-            <a href="#cta"><button
-                class="bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-lg text-lg transition duration-300">
-                Get Started
+
+          <div class="flex flex-col md:flex-row gap-[14px] mt-[20px] max-w-full md:max-w-[50vw] lg:max-w-auto">
+            <a href="#speed"><button
+                class="bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-lg text-lg transition duration-300 w-full">
+                Explore Xylume
               </button></a>
             <a href="docs.html" target="_blank"><button
-                class="border border-blue-600 hover:bg-blue-600/10 px-8 py-3 rounded-lg text-lg transition">
+                class="border border-blue-600 hover:bg-blue-600/10 px-8 py-3 rounded-lg text-lg transition w-full">
                 Read The Docs
               </button></a>
           </div>
         </div>
-      </div>
-    </section>
-<section id="features" class="py-20">
-  <div class="container mx-auto px-6">
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
 
-      <!-- Card 1 -->
-      <div class="relative p-8 rounded-xl backdrop-blur-xl bg-[#0f1225]/30 border border-blue-700/30 overflow-hidden featurecard hover:bg-[#0f1225]/50 transition duration-300">
-        <div class="absolute inset-0 bg-gradient-to-tr from-blue-500/10 via-transparent to-blue-300/10 pointer-events-none rounded-xl"></div>
-        <div class="relative z-10">
-          <i class="fa-solid fa-bolt text-3xl text-blue-500 mb-4"></i>
-          <h3 class="text-xl font-bold mb-4">Lightning Fast Transactions</h3>
-          <p class="text-gray-400">With sub-second transaction finalization times, enjoy near-instant transactions without sacrificing security.</p>
-        </div>
-      </div>
+        <div class="relative flex justify-center max-h-full">
+          <svg viewBox="0 0 600 600" role="img" class="w-full max-w-[520px] drop-shadow-[0_10px_30px_rgba(0,0,0,0.6)]">
+            <defs>
+              <linearGradient id="frameGrad" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0%" stop-color="rgba(255,255,255,0.7)" />
+                <stop offset="100%" stop-color="rgba(255,255,255,0.05)" />
+              </linearGradient>
 
-      <!-- Card 2 -->
-      <div class="relative p-8 rounded-xl backdrop-blur-xl bg-[#0f1225]/30 border border-blue-700/30 overflow-hidden featurecard hover:bg-[#0f1225]/50 transition duration-300">
-        <div class="absolute inset-0 bg-gradient-to-tr from-blue-500/10 via-transparent to-blue-300/10 pointer-events-none rounded-xl"></div>
-        <div class="relative z-10">
-          <i class="fa-solid fa-coins text-3xl text-blue-500 mb-4"></i>
-          <h3 class="text-xl font-bold mb-4">Dynamic Gas Model</h3>
-          <p class="text-gray-400">Experience efficient, fair, and adaptive gas fees based on network load, ensuring optimal performance while preventing spam.</p>
-        </div>
-      </div>
+              <!-- flowing gradient for links -->
+              <linearGradient id="flow" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#3B82F6" stop-opacity="0" />
+                <stop offset="50%" stop-color="#3B82F6" stop-opacity="1" />
+                <stop offset="100%" stop-color="#3B82F6" stop-opacity="0" />
+              </linearGradient>
 
-      <!-- Card 3 -->
-      <div class="relative p-8 rounded-xl backdrop-blur-xl bg-[#0f1225]/30 border border-blue-700/30 overflow-hidden featurecard hover:bg-[#0f1225]/50 transition duration-300">
-        <div class="absolute inset-0 bg-gradient-to-tr from-blue-500/10 via-transparent to-blue-300/10 pointer-events-none rounded-xl"></div>
-        <div class="relative z-10">
-          <i class="fa-solid fa-code text-3xl text-blue-500 mb-4"></i>
-          <h3 class="text-xl font-bold mb-4">Developer Friendly</h3>
-          <p class="text-gray-400">Developer-friendly and EVM-compatible, enabling seamless integration with existing libraries, tools, wallets, and dApps for effortless development and interaction with the Xylume network.</p>
-        </div>
-      </div>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
 
-      <!-- Card 4 -->
-      <div class="relative p-8 rounded-xl backdrop-blur-xl bg-[#0f1225]/30 border border-blue-700/30 overflow-hidden featurecard hover:bg-[#0f1225]/50 transition duration-300">
-        <div class="absolute inset-0 bg-gradient-to-tr from-blue-500/10 via-transparent to-blue-300/10 pointer-events-none rounded-xl"></div>
-        <div class="relative z-10">
-          <i class="fa-solid fa-network-wired text-3xl text-blue-500 mb-4"></i>
-          <h3 class="text-xl font-bold mb-4">DAG-based Architecture</h3>
-          <p class="text-gray-400">A Directed Acyclic Graph architecture enhances scalability, security, eliminating bottlenecks found in traditional blockchains by enabling parallel transaction validation.</p>
-        </div>
-      </div>
+            <!-- spinning rings -->
+            <g class="rings">
+              <circle cx="300" cy="300" r="220" stroke="url(#frameGrad)" stroke-width="2" fill="none" />
+              <circle cx="300" cy="300" r="260" stroke="url(#frameGrad)" stroke-width="2" fill="none"
+                stroke-dasharray="4 10" />
+              <circle cx="300" cy="300" r="120" stroke="url(#frameGrad)" stroke-width="1.5" fill="none"
+                stroke-dasharray="2 6" />
+            </g>
 
-      <!-- Card 5 -->
-      <div class="relative p-8 rounded-xl backdrop-blur-xl bg-[#0f1225]/30 border border-blue-700/30 overflow-hidden featurecard hover:bg-[#0f1225]/50 transition duration-300">
-        <div class="absolute inset-0 bg-gradient-to-tr from-blue-500/10 via-transparent to-blue-300/10 pointer-events-none rounded-xl"></div>
-        <div class="relative z-10">
-          <i class="fa-solid fa-shield text-3xl text-blue-500 mb-4"></i>
-          <h3 class="text-xl font-bold mb-4">PoUTX Validation</h3>
-          <p class="text-gray-400">Incorporating PoUTX for enhancing transaction validation and integrity, ensuring a highly secure and resilient decentralized network.</p>
-        </div>
-      </div>
+            <!-- links with flowing energy -->
+            <g class="links">
+              <line x1="300" y1="140" x2="480" y2="300" stroke="url(#frameGrad)" stroke-width="2" filter="url(#glow)"
+                stroke-linecap="round" />
+              <line x1="480" y1="300" x2="300" y2="480" stroke="url(#frameGrad)" stroke-width="2" filter="url(#glow)"
+                stroke-linecap="round" />
+              <line x1="300" y1="480" x2="120" y2="300" stroke="url(#frameGrad)" stroke-width="2" filter="url(#glow)"
+                stroke-linecap="round" />
+              <line x1="120" y1="300" x2="300" y2="140" stroke="url(#frameGrad)" stroke-width="2" filter="url(#glow)"
+                stroke-linecap="round" />
+            </g>
 
-      <!-- Card 6 -->
-      <div class="relative p-8 rounded-xl backdrop-blur-xl bg-[#0f1225]/30 border border-blue-700/30 overflow-hidden featurecard hover:bg-[#0f1225]/50 transition duration-300">
-        <div class="absolute inset-0 bg-gradient-to-tr from-blue-500/10 via-transparent to-blue-300/10 pointer-events-none rounded-xl"></div>
-        <div class="relative z-10">
-          <i class="fa-solid fa-shield-alt text-3xl text-blue-500 mb-4"></i>
-          <h3 class="text-xl font-bold mb-4">Attack Resistance</h3>
-          <p class="text-gray-400">Highly resistant to various attacks, such as 51% attacks, Sybil attacks and double-spending. The parent-child transaction relationships ensure that invalid transactions are easily identified and rejected.</p>
-        </div>
-      </div>
-
-    </div>
-  </div>
-</section>
-<section id="architecture-carousel" class="relative py-20 bg-gradient-to-b from-gray-900 to-gray-1000 overflow-hidden">
-  <div class="container mx-auto px-6 relative">
-    <div class="relative w-full flex items-center justify-center">
-      <div class="carousel relative w-full">
-        
-        <!-- ghost placeholder for height -->
-        <div id="carousel-ghost" class="invisible md:w-1/3"></div>
-
-        <!-- DAG Structure -->
-        <div class="carousel-card absolute left-1/2 -translate-x-1/2 md:w-1/3 transition-all duration-500 transform scale-90 opacity-50 z-0">
-          <div class="bg-[#1f2233]/80 border border-blue-600/30 backdrop-blur-xl shadow-lg rounded-xl p-8 flex flex-col">
-            <img src="./images/dag.jpg" class="w-full rounded-lg mb-4">
-            <h3 class="text-2xl font-bold mb-2 text-blue-400">DAG Structure</h3>
-            <p class="text-gray-400 text-sm">Xylume TestNet uses a Directed Acyclic Graph (DAG) for parallel, secure transaction validation. Parent-child transaction model ensures efficient processing.</p>
-          </div>
-        </div>
-
-        <!-- PoUTX -->
-        <div class="carousel-card absolute left-1/2 -translate-x-1/2 md:w-1/3 transition-all duration-500 transform scale-90 opacity-50 z-0">
-          <div class="bg-[#1f2233]/80 border border-blue-600/30 backdrop-blur-xl shadow-lg rounded-xl p-8 flex flex-col">
-            <img src="./images/poutx.jpg" class="w-full rounded-lg mb-4">
-            <h3 class="text-2xl font-bold mb-2 text-blue-400">PoUTX</h3>
-            <p class="text-gray-400 text-sm">Proof of Unspent Transaction eXploration verifies transactions using unspent outputs, prevents double-spending, and enables lightweight state dependencies.</p>
-          </div>
-        </div>
-
-        <!-- Attack Resistance -->
-        <div class="carousel-card absolute left-1/2 -translate-x-1/2 md:w-1/3 transition-all duration-500 transform scale-90 opacity-50 z-0">
-          <div class="bg-[#1f2233]/80 border border-blue-600/30 backdrop-blur-xl shadow-lg rounded-xl p-8 flex flex-col">
-            <img src="./images/shield.jpg" class="w-full rounded-lg mb-4">
-            <h3 class="text-2xl font-bold mb-2 text-blue-400">Attack Resistance</h3>
-            <p class="text-gray-400 text-sm">Resistant to 51%, Sybil, and double-spending attacks. DAG + PoUTX ensures no single entity controls the network and invalid transactions are blocked.</p>
-          </div>
-        </div>
-
-        <!-- Decentralization -->
-        <div class="carousel-card absolute left-1/2 -translate-x-1/2 md:w-1/3 transition-all duration-500 transform scale-90 opacity-50 z-0">
-          <div class="bg-[#1f2233]/80 border border-blue-600/30 backdrop-blur-xl shadow-lg rounded-xl p-8 flex flex-col">
-            <img src="./images/p2p.png" class="w-full rounded-lg mb-4">
-            <h3 class="text-2xl font-bold mb-2 text-blue-400">Decentralization</h3>
-            <p class="text-gray-400 text-sm">P2P node system with socket-based connections and auto-maintained healthy node list ensures distributed consensus and network resilience.</p>
-          </div>
-        </div>
-
-        <!-- Security -->
-        <div class="carousel-card absolute left-1/2 -translate-x-1/2 md:w-1/3 transition-all duration-500 transform scale-90 opacity-50 z-0">
-          <div class="bg-[#1f2233]/80 border border-blue-600/30 backdrop-blur-xl shadow-lg rounded-xl p-8 flex flex-col">
-            <img src="./images/security.jpg" class="w-full rounded-lg mb-4">
-            <h3 class="text-2xl font-bold mb-2 text-blue-400">Security</h3>
-            <p class="text-gray-400 text-sm">Cryptography + PoUTX ensures transaction integrity and authenticity. BLAKE2b hashing provides high-speed, secure performance.</p>
-          </div>
-        </div>
-
-        <!-- Gas & Tokenomics -->
-        <div class="carousel-card absolute left-1/2 -translate-x-1/2 md:w-1/3 transition-all duration-500 transform scale-90 opacity-50 z-0">
-          <div class="bg-[#1f2233]/80 border border-blue-600/30 backdrop-blur-xl shadow-lg rounded-xl p-8 flex flex-col">
-            <img src="./images/gas.jpg" class="w-full rounded-lg mb-4">
-            <h3 class="text-2xl font-bold mb-2 text-blue-400">Gas & Tokenomics</h3>
-            <p class="text-gray-400 text-sm">Dynamic gas model with XYL tokens, adjustable base fee, and initial supply of 6,942,340 XYL ensures fair network participation.</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Arrows -->
-      <button id="prev" class="absolute left-0 text-white text-4xl px-4 z-20">‹</button>
-      <button id="next" class="absolute right-0 text-white text-4xl px-4 z-20">›</button>
-    </div>
-  </div>
-</section>
-<script>
-const cards = Array.from(document.querySelectorAll('.carousel-card'));
-let centerIndex = 0;
-
-function renderCarousel() {
-  const containerHeight = Math.max(...cards.map(c => c.offsetHeight));
-  document.querySelector('.carousel').style.height = containerHeight + 'px';
-
-  const isMobile = window.innerWidth < 768; // adjust breakpoint as needed
-
-  cards.forEach((card, i) => {
-    let offset = i - centerIndex;
-
-    // wrap offsets cyclically
-    if (offset < -Math.floor(cards.length / 2)) offset += cards.length;
-    if (offset > Math.floor(cards.length / 2)) offset -= cards.length;
-
-    card.style.transition = 'all 0.5s ease';
-
-    if (offset === 0) {
-      card.style.transform = 'translateX(-50%) scale(1)';
-      card.style.opacity = '1';
-      card.style.zIndex = '10';
-    } else if (offset === -1) {
-      if (isMobile) {
-        card.style.transform = 'translateX(-60%) scale(0.9)'; // less offset, peek
-        card.style.opacity = '0.5';
-      } else {
-        card.style.transform = 'translateX(-150%) scale(0.9)';
-        card.style.opacity = '0.5';
-      }
-      card.style.zIndex = '5';
-    } else if (offset === 1) {
-      if (isMobile) {
-        card.style.transform = 'translateX(-40%) scale(0.9)'; // peek on right
-        card.style.opacity = '0.5';
-      } else {
-        card.style.transform = 'translateX(50%) scale(0.9)';
-        card.style.opacity = '0.5';
-      }
-      card.style.zIndex = '5';
-    } else {
-      card.style.transform = 'translateX(-50%) scale(0.8)';
-      card.style.opacity = '0';
-      card.style.zIndex = '0';
-    }
-  });
-}
-
-document.getElementById('next').onclick = () => {
-  centerIndex = (centerIndex + 1) % cards.length;
-  renderCarousel();
-};
-
-document.getElementById('prev').onclick = () => {
-  centerIndex = (centerIndex - 1 + cards.length) % cards.length;
-  renderCarousel();
-};
-
-window.addEventListener('resize', renderCarousel);
-window.addEventListener('load', renderCarousel);
-</script>
-
-    <section id="stats" class="py-20 bg-gradient-to-b from-gray-800/50 to-gray-900/50">
-      <div class="container mx-auto px-6">
-        <div class="grid overflow-hidden grid-cols-2 md:grid-cols-4 gap-8 text-center h-[15vh]">
-          <div>
-            <div class="text-4xl hover:text-5xl transition-all duration-500 font-bold text-blue-500 mb-2">0.05s</div>
-            <div class="text-gray-400">Average TX Confirmation Time <br><span class="text-gray-600 text-sm">*Under ideal
-                network latency and load</span></div>
-          </div>
-          <div>
-            <div class="text-4xl hover:text-5xl transition-all duration-500 font-bold text-blue-500 mb-2">120K+</div>
-            <div class="text-gray-400">Theoretical TPS <br><span class="text-gray-600 text-sm">*Under ideal conditions,
-                actual TPS may vary depending on network activity and conditions</span></div>
-          </div>
-          <div>
-            <div class="text-4xl hover:text-5xl transition-all duration-500 font-bold text-blue-500 mb-2">0.000069 XYL
-            </div>
-            <div class="text-gray-400">Base Fee <br><span class="text-gray-600 text-sm">*Dynamic based on network load
-                and incoming TPS</span></div>
-          </div>
-          <div>
-            <div class="text-4xl hover:text-5xl transition-all duration-500 font-bold text-blue-500 mb-2">6,942,340 XYL
-            </div>
-            <div class="text-gray-400">Total Supply <br><span class="text-gray-600 text-sm">*Initial mint</span></div>
-          </div>
+            <!-- nodes -->
+            <g class="nodes">
+              <circle cx="300" cy="140" r="6" class="node" fill="#3B82F6" />
+              <circle cx="480" cy="300" r="6" class="node" fill="#3B82F6" />
+              <circle cx="300" cy="480" r="6" class="node" fill="#3B82F6" />
+              <circle cx="120" cy="300" r="6" class="node" fill="#3B82F6" />
+            </g>
+          </svg>
         </div>
       </div>
     </section>
-    <section id="cta" class="py-20">
-      <div class="container mx-auto px-6">
-        <div class="bg-gradient-to-b from-blue-600/20 to-blue-600/10 rounded-2xl p-12 text-center">
-          <h2 class="text-3xl md:text-4xl font-bold mb-6">Ready to experience Xylume TestNet?</h2>
-          <p class="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
-            Where efficiency, speed, security, and scalability converge.
+
+    <section id="speed"
+      class="max-w-[90vw] lg:max-w-[76rem] mx-auto lg:grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr] gap-[34px] items-stretch">
+      <!-- Text Column -->
+      <div class="flex items-center">
+        <div class="relative overflow-hidden w-full">
+          <h2 class="m-0 mb-4 text-[clamp(28px,4.8vw,58px)]">Microsecond Finality</h2>
+          <p class="text-[#9aa3c7]">
+            Deterministic execution with parallel pipelines. Throughput that scales with you.
           </p>
-          <div class="flex justify-center space-x-4">
-            <a href="https://chainid.network/chain/6934/">
-              <button
-                class="bg-blue-600 hover:scale-105 hover:bg-blue-700 px-8 py-3 rounded-lg text-lg transition duration-300">
-                Connect
-              </button>
-            </a>
-            <a href="docs.html" target="_blank">
-              <button
-                class="bg-white text-blue-900 hover:scale-105 hover:bg-gray-100 px-8 py-3 rounded-lg text-lg transition duration-300">
-                View Documentation
-              </button>
-            </a>
+
+          <ul class="flex flex-wrap gap-[20px] mt-5 list-none p-0">
+            <li><span class="text-[28px] font-extrabold text-[#56a7ff] mr-[6px]">50 µs</span> Finality</li>
+            <li><span class="text-[28px] font-extrabold text-[#56a7ff] mr-[6px]">120k</span> Max TPS</li>
+            <li><span class="text-[28px] font-extrabold text-[#56a7ff] mr-[6px]">69 µXYL</span> Average Gas</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Visual Column -->
+      <div class="relative flex justify-center pt-12 lg:pt-auto" id="speed-visual">
+        <div class="relative min-h-[340px] w-full p-[26px] rounded-[28px] border border-blue-700/50 
+          shadow-2xl transition duration-500 hover:shadow-[0_0_80px_rgba(59,130,246,0.3)] 
+          bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))]">
+
+          <!-- Ticker -->
+          <div class="absolute left-0 right-0 bottom-[24px] overflow-hidden">
+            <div class="whitespace-nowrap font-[Michroma] tracking-[0.18em] opacity-80 tickerL text-[#e7ecff]">
+              STRUCTURAL FINALITY • DETERMINISTIC LOGIC • PARALLEL EXECUTION • MEV-SAFE • OPEN-SOURCE • STRUCTURAL
+              FINALITY • DETERMINISTIC LOGIC • PARALLEL EXECUTION • MEV-SAFE • OPEN-SOURCE •
+            </div>
+            <div class="whitespace-nowrap font-[Michroma] tracking-[0.18em] opacity-55 tickerR text-[#e7ecff]">
+              ASYNCHRONOUS LEDGER • PROTOCOL ENFORCED • DYNAMIC FEES • HIGH-THROUGHPUT • HYBRID L1 • ASYNCHRONOUS LEDGER
+              • PROTOCOL ENFORCED • DYNAMIC FEES • HIGH-THROUGHPUT • HYBRID L1 •
+            </div>
+          </div>
+
+          <!-- Overlay capsule -->
+          <div class="absolute inset-auto right-[20px] bottom-[80px] w-[220px] h-[88px] rounded-full 
+            bg-[radial-gradient(120px_60px_at_30%_50%,rgba(86,167,255,0.45),rgba(255,255,255,0.06))]
+            border border-[rgba(255,255,255,0.18)]
+            shadow-[0_10px_30px_rgba(0,0,0,0.4)_inset_0_0_30px_rgba(86,167,255,0.2)]
+            backdrop-blur-[8px] translate-y-[20px] opacity-0 transition-all duration-600 ease-[ease]">
           </div>
         </div>
       </div>
     </section>
 
-    
+    <section id="features" class="pt-[120px] lg:pt-[180px]">
+      <div class="max-w-[76rem] mx-auto px-6">
+        <h2 class="text-center text-[clamp(28px,4.8vw,58px)] font-bold mb-16">Core Capabilities</h2>
 
-    <footer id="footer" class="bg-gradient-to-b from-gray-900/50 to-black pt-12 pb-5 ">
-      <div class="container mx-auto px-4 pt-12 pb-5">
-        <div class="grid md:grid-cols-4 gap-8">
-          <div class="flex flex-row">
-            <image src="./images/xylume_transparent.png" class="w-24 h-24 unselectable">
-              <div class="flex flex-col space-y-2 mb-4">
-                <span class="text-xl font-bold">Xylume TestNet</span>
-                <p class="text-gray-400">Innovating the Future of Decentralized Ecosystems.</p>
+        <div class="mb-0 md:mb-12 py-12 md:py-0">
+          <div
+            class="relative p-12 rounded-3xl bg-[#0f1225]/50 border border-blue-700/50 shadow-2xl transition duration-500 hover:shadow-[0_0_80px_rgba(59,130,246,0.3)]">
+            <div class="flex flex-col lg:flex-row items-start lg:items-center space-y-6 lg:space-y-0 lg:space-x-12">
+
+              <div class="flex-shrink-0 w-full lg:w-auto flex justify-center lg:block">
+                <i class="fa-solid fa-network-wired text-[80px] text-blue-400 floating mb-4 lg:mb-0"></i>
               </div>
+
+              <div>
+                <span class="text-lg font-bold text-blue-500 mb-2 block">Foundational Innovation</span>
+                <h3 class="text-4xl font-extrabold mb-4">UTXO DAG-based Architecture</h3>
+                <p class="text-gray-300 text-lg max-w-4xl">
+                  The architecture is a <b>structural fusion</b> of the <b>Directed Acyclic Graph (DAG)</b> and the
+                  granular state integrity of the <b>UTXO model</b>.
+                  This design transcends linear constraints, enabling <b>parallel transaction validation</b> and
+                  <b>unprecedented scalability</b> while securing the ledger at its bedrock.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+          <div
+            class="feature-card-small p-8 rounded-xl bg-[#0f1225]/30 border border-blue-700/30 hover:bg-[#0f1225]/60 transition duration-300">
+            <i class="fa-solid fa-bolt text-3xl text-blue-500 mb-4"></i>
+            <h3 class="text-xl font-bold mb-2">Lightning Fast Transactions</h3>
+            <p class="text-gray-400">With <b>microsecond confirmation times</b> and <b>structural finality</b>,
+              enjoy near-instant transactions without sacrificing security or decentralization.</p>
+          </div>
+
+          <div
+            class="feature-card-small p-8 rounded-xl bg-[#0f1225]/30 border border-blue-700/30 hover:bg-[#0f1225]/60 transition duration-300">
+            <i class="fa-solid fa-coins text-3xl text-blue-500 mb-4"></i>
+            <h3 class="text-xl font-bold mb-2">Dynamic Gas Model</h3>
+            <p class="text-gray-400">An efficient, fair, and <b>adaptive gas model</b> that scales based on
+              incoming load ensures optimal performance while preventing spam.</p>
+          </div>
+
+          <div
+            class="feature-card-small p-8 rounded-xl bg-[#0f1225]/30 border border-blue-700/30 hover:bg-[#0f1225]/60 transition duration-300">
+            <i class="fa-solid fa-code text-3xl text-blue-500 mb-4"></i>
+            <h3 class="text-xl font-bold mb-2">Developer Friendly (EVM)</h3>
+            <p class="text-gray-400">Featuring <b>Hybrid EVM compatibility</b>, Xylume follows the core <b>Ethereum
+                standards</b>,
+              making development and integrations with existing tools effortlessly developer-friendly.</p>
+          </div>
+
+          <div
+            class="feature-card-small p-8 rounded-xl bg-[#0f1225]/30 border border-blue-700/30 hover:bg-[#0f1225]/60 transition duration-300">
+            <i class="fa-solid fa-fingerprint text-3xl text-blue-500 mb-4"></i>
+            <h3 class="text-xl font-bold mb-2">Consensus-Free DLT</h3>
+            <p class="text-gray-400">Integrity is guaranteed by <b>deterministic protocol logic</b>, not social
+              agreement.
+              The protocol enforces <b>irreversible finality</b> without relying on time-consuming voting or majority
+              consensus.</p>
+          </div>
+
+          <div
+            class="feature-card-small p-8 rounded-xl bg-[#0f1225]/30 border border-blue-700/30 hover:bg-[#0f1225]/60 transition duration-300 md:col-span-2 flex flex-col lg:flex-row items-start lg:items-center space-y-6 lg:space-y-0 lg:space-x-12">
+            <i class="fa-solid fa-shield-alt text-[80px] text-blue-500 mb-4"></i>
+            <div>
+              <h3 class="text-2xl font-bold mb-2">Attack Resistance</h3>
+              <p class="text-gray-300 text-lg">The network's <b>structural design</b> provides <b>fundamental
+                  immunity</b> to <b>51% attacks</b>, Sybil attacks, and double-spending.
+                The architecture eliminates the ability to reorganize transaction history, ensuring uncompromising
+                integrity.</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <section id="architecture" class="pt-[120px] lg:pt-[180px]">
+      <div class="max-w-[76rem] mx-auto px-6">
+        <h2 class="text-center text-[clamp(28px,4.8vw,58px)] font-bold mb-16">Architecture</h2>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-12 max-h-auto pt-6 md:pt-0">
+
+          <div class="col-span-1 grid gap-y-4 md:block md:space-y-4">
+            <div id="arch-dag-tab" data-target="dag"
+              class="arch-tab p-6 rounded-lg cursor-pointer active bg-blue-600/20 border-blue-500 border-l-4 transition-all duration-300 hover:border-blue-500/50 hover:bg-blue-600/20 w-full md:w-auto">
+              <h4 class="text-2xl font-bold">1. DAG Structure</h4>
+              <p class="text-sm text-gray-400"><b>Unprecedented scalability</b>.</p>
+            </div>
+
+            <div id="arch-utxo-tab" data-target="utxo"
+              class="arch-tab p-6 rounded-lg cursor-pointer bg-[#1f2233]/45 border-l-4 border-blue-700/30 transition-all duration-300 hover:border-blue-500/50 hover:bg-blue-600/20 w-full md:w-auto">
+              <h4 class="text-2xl font-bold">2. UTXO Model</h4>
+              <p class="text-sm text-gray-400"><b>Scalable validation</b> and state integrity.</p>
+            </div>
+
+            <div id="arch-decentralization-tab" data-target="decentralization"
+              class="arch-tab p-6 rounded-lg cursor-pointer bg-[#1f2233]/45 border-l-4 border-blue-700/30 transition-all duration-300 hover:border-blue-500/50 hover:bg-blue-600/20 w-full md:w-auto">
+              <h4 class="text-2xl font-bold">3. Decentralization & P2P</h4>
+              <p class="text-sm text-gray-400"><b>Autonomous P2P node system</b></p>
+            </div>
+
+            <div id="arch-resistance-tab" data-target="resistance"
+              class="arch-tab p-6 rounded-lg cursor-pointer bg-[#1f2233]/45 border-l-4 border-blue-700/30 transition-all duration-300 hover:border-blue-500/50 hover:bg-blue-600/20 w-full md:w-auto">
+              <h4 class="text-2xl font-bold">4. Attack Resistance</h4>
+              <p class="text-sm text-gray-400"><b>Structural immunity</b> against attacks</p>
+            </div>
+
+            <div id="arch-gas-tab" data-target="gas"
+              class="arch-tab p-6 rounded-lg cursor-pointer bg-[#1f2233]/45 border-l-4 border-blue-700/30 transition-all duration-300 hover:border-blue-500/50 hover:bg-blue-600/20 w-full md:w-auto">
+              <h4 class="text-2xl font-bold">5. Gas & Tokenomics</h4>
+              <p class="text-sm text-gray-400">The <b>economic backbone</b> (XYL).</p>
+            </div>
+          </div>
+
+          <div class="lg:col-span-2">
+            <div id="arch-content-container"
+              class="bg-[#1f2233]/45 border border-blue-600/30 backdrop-blur-xl shadow-2xl rounded-2xl p-8 lg:h-full">
+              <div id="arch-content-inner" class="opacity-0 transition-opacity duration-300"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="cta" class="py-24 pt-[120px] lg:pt-[180px]">
+      <div class="container max-w-[76rem] mx-auto px-6">
+        <div
+          class="bg-gradient-to-br from-blue-900/40 to-black/80 border border-blue-600/30 rounded-3xl p-16 text-center shadow-[0_0_80px_rgba(59,130,246,0.15)] relative overflow-hidden">
+          <div class="absolute inset-0 z-0 opacity-20 floating"
+            style="background: radial-gradient(circle at 70% 30%, rgba(59, 130, 246, 0.4) 0%, transparent 50%);"></div>
+
+          <div class="relative z-10">
+            <div class="text-center mb-6">
+              <h2 class="text-4xl md:text-6xl font-extrabold font-[Michroma] text-blue-400 inline-block m-0 p-0">
+                X
+              </h2>
+              <h2 class="text-4xl md:text-6xl font-extrabold font-[Michroma] text-white inline-block m-0 p-0 mr-6">
+                perience
+              </h2>
+              <h2 class="text-4xl md:text-6xl font-extrabold font-[Michroma] text-blue-400 inline-block m-0 p-0">
+                X
+              </h2>
+              <h2 class="text-4xl md:text-6xl font-extrabold font-[Michroma] text-white inline-block m-0 p-0">
+                ylume
+              </h2>
+            </div>
+            <p class="text-xl text-gray-300 mb-10 max-w-4xl mx-auto">
+              Connect your wallet, grab some XYL from the faucet, and experience the next generation of Web3 innovation
+              today.
+            </p>
+            <div class="flex justify-center flex-wrap gap-4">
+              <a href="https://chainid.network/chain/6934/" target="_blank">
+                <button
+                  class="bg-blue-600 hover:scale-105 hover:bg-blue-700 px-10 py-4 rounded-xl text-xl font-bold transition duration-300 shadow-lg shadow-blue-500/30">
+                  Connect Wallet
+                </button>
+              </a>
+              <a href="https://xylume-faucet.vercel.app/" target="_blank">
+                <button
+                  class="border border-white/30 text-white hover:scale-105 hover:bg-white/10 px-10 py-4 rounded-xl text-xl font-bold transition duration-300">
+                  Get Test Tokens
+                </button>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer id="footer" class="bg-gradient-to-b from-gray-900/50 to-black pt-[120px] lg:pt-[180px] pb-12">
+      <div class="container mx-auto max-w-[88rem]">
+        <div class="grid md:grid-cols-5 gap-8">
+          <img src="./images/xylume_transparent.png" class="w-32 h-32 unselectable">
+          <div class="flex flex-col space-y-2 mb-4">
+            <span class="text-xl font-bold">Xylume TestNet</span>
+            <p class="text-gray-400">Innovating the Future of Web3.</p>
           </div>
           <div>
             <h4 class="text-lg font-bold mb-4">Resources</h4>
@@ -554,7 +684,7 @@ window.addEventListener('load', renderCarousel);
               <a href="https://github.com/debxylen/Xylume_TestNet" target="_blank">
                 <li><span class="hover:text-blue-500 transition duration-300 cursor-pointer">Source Code</span></li>
               </a>
-              <a href="faucet.html" target="_blank">
+              <a href="https://xylume-faucet.vercel.app/" target="_blank">
                 <li><span class="hover:text-blue-500 transition duration-300 cursor-pointer">Faucet</span></li>
               </a>
             </ul>
@@ -568,8 +698,194 @@ window.addEventListener('load', renderCarousel);
         </div>
       </div>
     </footer>
+
   </div>
+
+  <script id="loader">
+    window.addEventListener("load", function () {
+      const loader = document.getElementById("loaderOverlay");
+      loader.style.opacity = 0;
+      setTimeout(() => loader.remove(), 500); // fade out then yeet
+    });
+  </script>
+
+  <script id="tab-renderer">
+    document.addEventListener('DOMContentLoaded', () => {
+      // Content data structured for easy swapping
+      const contentData = {
+        'dag': {
+          img: './images/dag.jpg',
+          title: 'DAG Structure',
+          text: 'Xylume utilizes a <b>Directed Acyclic Graph (DAG)</b> to orchestrate parallel transaction flow. This structural design transcends linear constraints and eliminates traditional bottlenecks, delivering <b>unprecedented speed and scalability</b>.'
+        },
+        'utxo': {
+          img: './images/utxo.jpg',
+          // CRITICAL: Recommended to change title to reflect the UTXO model name used in the tab
+          title: 'UTXO Model',
+          text: 'A lightweight <b>UTXO system</b> achieves <b>irreversible finality</b> by fusing with the DAG’s parent-child relation. This mechanism guarantees state integrity, inherently preventing double-spending for <b>maximum security and efficiency</b>.'
+        },
+        'decentralization': {
+          img: './images/p2p.png',
+          title: 'Decentralization & P2P',
+          // CRITICAL CORRECTION: Removed 'distributed consensus'
+          text: 'A resilient <b>P2P node system</b> establishes network authority through self-validation and socket-based connections. This architecture ensures <b>robust decentralized operation</b> and uncompromising censorship resistance.'
+        },
+        'resistance': {
+          img: './images/shield.jpg',
+          title: 'Attack Resistance',
+          text: 'The fusion of <b>DAG structure</b> and <b>UTXO state logic</b> provides <b>fundamental immunity</b> to traditional threats. This architecture eliminates the longest chain rule and the ability to reorganize history, making 51%, Sybil, and double-spending attacks ineffective.'
+        },
+        'gas': {
+          img: './images/gas.jpg',
+          title: 'Gas & Tokenomics',
+          text: 'The <b>Dynamic Gas Model</b> utilizes the native Xylume (<b>XYL</b>) token, intelligently adjusting fees in real-time based on network demand. This <b>self-regulating economic mechanism</b> ensures precision pricing, guaranteeing <b>cost-effective participation</b> and sustaining optimal network performance.'
+        }
+      };
+      // Function to render the new content into the container
+      const renderContent = (data) => {
+        return `
+          <img src="${data.img}" class="w-full h-auto max-h-[300px] rounded-xl mb-6 object-cover">
+          <h3 class="text-3xl font-bold mb-3 text-blue-400">${data.title}</h3>
+          <p class="text-gray-400 text-lg">${data.text}</p>
+        `;
+      };
+
+      const tabs = document.querySelectorAll('.arch-tab');
+      const inner = document.getElementById('arch-content-inner');
+      const FADE_DURATION = 300;
+
+      // fill initial content
+      inner.innerHTML = renderContent(contentData['dag']);
+      requestAnimationFrame(() => inner.classList.add('opacity-100'));
+
+      const switchContent = (targetKey, clickedTab) => {
+        const newContent = contentData[targetKey];
+        if (!newContent) return;
+
+        // fade out
+        inner.classList.remove('opacity-100');
+        inner.classList.add('opacity-0');
+
+        // wait for fade-out to finish
+        setTimeout(() => {
+          // swap content
+          inner.innerHTML = renderContent(newContent);
+
+          // force browser to register opacity-0 before fade-in
+          requestAnimationFrame(() => inner.classList.add('opacity-100'));
+        }, FADE_DURATION);
+
+        // update tabs
+        tabs.forEach(tab => {
+          const isTarget = tab === clickedTab;
+          tab.classList.toggle('active', isTarget);
+          tab.classList.toggle('bg-blue-600/20', isTarget);
+          tab.classList.toggle('border-blue-500', isTarget);
+          tab.classList.toggle('bg-[#1f2233]/45', !isTarget);
+          tab.classList.toggle('border-blue-700/30', !isTarget);
+        });
+      };
+
+      // Add click listeners to all tabs
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          const targetKey = tab.getAttribute('data-target');
+          switchContent(targetKey, tab);
+        });
+      });
+    });
+  </script>
+
+  <script id="ecosystem-nav-handler">
+    // Function to handle the staggered fade out
+    function staggerFadeOut(element) {
+      const children = Array.from(element.children).filter(child => child.classList.contains('animated-nav-item'));
+
+      children.forEach((child, index) => {
+        setTimeout(() => {
+          child.classList.remove('opacity-100');
+          child.classList.add('opacity-0');
+        }, index * 50); // 50ms stagger
+      });
+
+      return new Promise(resolve => {
+        const totalChildDelay = children.length * 50;
+
+        // Fade out the PARENT CONTAINER slightly after children begin
+        setTimeout(() => {
+          element.classList.remove('opacity-100');
+          element.classList.add('opacity-0');
+        }, 100);
+
+        // Resolve after the full duration for the container to disappear
+        setTimeout(() => resolve(), totalChildDelay + 50);
+      });
+    }
+
+    // Function to handle the staggered fade in
+    function staggerFadeIn(element) {
+      // 1. Make the container immediately visible and opaque
+      element.classList.remove('invisible', 'pointer-events-none', 'opacity-0');
+      element.classList.add('opacity-100');
+
+      const children = Array.from(element.children).filter(child => child.classList.contains('animated-nav-item'));
+
+      // 2. Start staggering the children
+      children.forEach((child, index) => {
+        setTimeout(() => {
+          child.classList.remove('opacity-0');
+          child.classList.add('opacity-100');
+        }, index * 50 + 150); // Added delay to let the parent container transition first
+      });
+    }
+
+    function setupNavSwap() {
+      const mainNav = document.getElementById('mainNav');
+      const ecosystemNav = document.getElementById('ecosystemNav');
+      const ecosystemButton = document.getElementById('ecosystemButton');
+
+      let isEcosystemActive = false;
+      let transitionTimeout;
+
+      const transitionToEcosystem = () => {
+        if (isEcosystemActive) return;
+        isEcosystemActive = true;
+
+        clearTimeout(transitionTimeout);
+
+        staggerFadeOut(mainNav).then(() => {
+          mainNav.classList.add('invisible', 'pointer-events-none');
+          staggerFadeIn(ecosystemNav);
+        });
+      };
+
+      const transitionToMain = () => {
+        if (!isEcosystemActive) return;
+
+        isEcosystemActive = false;
+        clearTimeout(transitionTimeout);
+
+        // Delay the transition back slightly
+        transitionTimeout = setTimeout(() => {
+          staggerFadeOut(ecosystemNav).then(() => {
+            ecosystemNav.classList.add('invisible', 'pointer-events-none');
+            staggerFadeIn(mainNav);
+          });
+        }, 150);
+      };
+
+      // 1. Hover on the Ecosystem button triggers the swap
+      ecosystemButton.addEventListener('mouseenter', transitionToEcosystem);
+
+      // 2. Hovering *out* of the ecosystem nav triggers the return
+      ecosystemNav.addEventListener('mouseleave', transitionToMain);
+    }
+
+    document.addEventListener('DOMContentLoaded', setupNavSwap);
+  </script>
+
   <script src="smoothscroll.js"></script>
+
 </body>
 
 </html>
