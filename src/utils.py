@@ -18,3 +18,6 @@ def round_to_valid_amount(amount):
     # Round the amount to the nearest valid value (1 million wei in this case)
     valid_amount = 1000000
     return (amount // valid_amount) * valid_amount
+
+def blank():
+    return None

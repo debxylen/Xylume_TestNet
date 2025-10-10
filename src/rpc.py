@@ -126,9 +126,9 @@ class RPC(Flask):
         tx = self.core.get_tx_by_number(block_number)
         if not tx:
             return {'jsonrpc': '2.0', 'result': None, 'id': data.get('id')}
-        tx = tx.__json__()
+        tx_json = tx.__json__()
         try:
-            return {'jsonrpc': '2.0', 'result': tx, 'id': data.get('id')}
+            return {'jsonrpc': '2.0', 'result': tx_json, 'id': data.get('id')}
         except:
             return {'jsonrpc': '2.0', 'result': None, 'id': data.get('id')}
         

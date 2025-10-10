@@ -52,8 +52,3 @@ def tx_decode(raw_tx: str):
     s = hex(tx.s)
     chainId = (tx.v - 35) // 2 if tx.v % 2 else (tx.v - 36) // 2
     return asdict(DecodedTx(hashTx, from_, to, tx.nonce, tx.gas, tx.gasPrice, tx.value, data, chainId, r, s, str(hex(tx.v))))
-
-
-
-
-

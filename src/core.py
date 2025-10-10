@@ -1,5 +1,6 @@
+from revert_exceptions import *
 from utils import *
-from tx_sign import *
+# from tx_sign import *
 from tx_decode import *
 from dag import *
 import traceback
@@ -33,6 +34,9 @@ TOKEN_CONTRACT = constants["TOKEN_CONTRACT"]
 legendary_number = 6934  # Chosen by the ancient gods of computation
 
 ## To Do:
+## - Remove preflights from most places except eth_sRT and process_received [entry point of transactions]
+## - Transactions failed during runtime should be included in the DAG, also spend gas.
+## - Indexing, etc for faster operations, eliminating O(n)+ times.
 ## - Better error logging (printing function name along with traceback, etc)
 ## - Integrate and deploy XEVM into production.
 ## - Batch transactions and atomic bundles
@@ -52,7 +56,7 @@ class Core:
             self.load_dag()
             self.genesis = self.dag.nodes[list(self.dag.nodes)[0]]['transaction']
         else:
-            self.genesis = Transaction(sender=NULL_ADDRESS, recipient=MINT_ADDRESS, amount=INITIAL_SUPPLY, gas=0, parents=[])
+            self.genesis = Transaction(sender=NULL_ADDRESS, recipient=MINT_ADDRESS, amount=INITIAL_SUPPLY, gas=0, parents=[], nonce=0, data="0x", status=1, logs=[])
             self.dag = DAG(self.genesis)
             self.save_dag()
         self.tokens_lock = RWLockFair()
@@ -83,13 +87,13 @@ class Core:
         self.mine_passive()
         self.ws.start()
 
-    def add_pending(self, sender, recipient, amount: int, gas, nonce = None, data = '0x'):
+    def add_pending(self, sender, recipient, amount: int, gas, nonce = None, data = "0x"):
         """Add a new transaction to the mempool."""
         sender, recipient = sender.lower(), recipient.lower()
         amount, gas = int(amount), int(gas)
         if nonce == None:
             nonce = self.get_transaction_count(sender)
-        transaction = Transaction(sender, recipient, amount, gas, [], nonce, data) # pending tx, diff from normal ones
+        transaction = Transaction(sender, recipient, amount, gas, [], nonce, data, 1, []) # pending tx, diff from normal ones
         with self.mempool_lock.gen_wlock(): self.mempool.append(transaction)
         return transaction
 
@@ -110,6 +114,7 @@ class Core:
         confirmed_balance = sum(
             tx.juice for node in nodes_snapshot
             if (tx := node.get("transaction"))
+            and tx.status == 1
             and tx.recipient == address
             and tx.juice > 0
         )
@@ -139,9 +144,10 @@ class Core:
                 pending_out += tx.amount + tx.gas
 
         # Include funnel
-        with self.funnel_lock.gen_rlock():
+        with self.funnel_cn:
             funnel_snapshot = list(self.funnel)
-        for tx in funnel_snapshot:
+        for _tx in funnel_snapshot:
+            tx = _tx["tx"]
             if tx.recipient == address:
                 pending_in += tx.amount
             if tx.sender == address:
@@ -157,7 +163,7 @@ class Core:
         with self.dag_lock.gen_rlock():
             nodes_snapshot = list(self.dag.nodes.values())
         for node in nodes_snapshot:
-            if (tx := node.get("transaction")) and tx.sender.lower() == sender_address:
+            if (tx := node.get("transaction")) and tx.sender.lower() == sender_address: # failed transactions also add to nonce
                 count += 1
 
         if mode.lower() == 'latest':
@@ -178,9 +184,10 @@ class Core:
                 count += 1
 
         # Include funnel
-        with self.funnel_lock.gen_rlock():
+        with self.funnel_cn:
             funnel_snapshot = list(self.funnel)
-        for tx in funnel_snapshot:
+        for _tx in funnel_snapshot:
+            tx = _tx["tx"]
             if tx.sender.lower() == sender_address:
                 count += 1
 
@@ -208,7 +215,7 @@ class Core:
         job = {"transactions": [tx if node_miner else tx.__json__()]}
         return job
 
-    def start_retry(self):
+    def start_retry(self): # retries transactions unmined for >= 2s
         def _retry():
             while True:
                 time.sleep(0.5)
@@ -229,15 +236,13 @@ class Core:
                     if not parents:
                         continue
 
-                    if not self.simulate_contract(tx):
-                        continue
-
                     # send to funnel
                     with self.funnel_cn:
                         self.funnel.append({
                             "tx": tx,
                             "parents": parents,
-                            "miner": NETWORK_MINER
+                            "miner": NETWORK_MINER,
+                            "source": "self",
                         })
                         self.funnel_cn.notify()
 
@@ -282,98 +287,201 @@ class Core:
                     tx, parents, NODE_ADDRESS, miner, MINER_FEE_SHARE
                 )
 
-                self.handle_peer_voting(finalizedtx, parents, tx.gas, NODE_ADDRESS, miner, MINER_FEE_SHARE)
+                if (tx_entry["source"] != "peer") and (finalizedtx, noderewardtx, minerrewardtx):
+                    self.handle_peer_voting(finalizedtx, parents, tx.gas, NODE_ADDRESS, miner, MINER_FEE_SHARE)
 
         Thread(target=_funnel, daemon=True).start()
 
-    def _process_contract_interaction(self, tx, simulate=False):
-        if type(tx) == dict:
-            sender = tx["sender"].lower()
-            recipient = tx["recipient"].lower()
-            nonce = tx["nonce"]
-            data = tx["data"]
-        else:
-            sender = tx.sender.lower()
-            recipient = tx.recipient.lower()
-            nonce = tx.nonce
-            data = tx.data
+    def process_contract(self, tx, simulate=False, return_message=False, return_revert_fn=False):
+        """simulate = False -> bool
+               True = Successful execution
+               False = Execution failure
+           simulate = True -> bool
+               True = Successful preflight
+               False = Deterministic/static errors
+               None = Runtime/state-dependent errors
+        """
+        logs = []
+        written = False # whether self.tokens was modified
+        changes = []
+        try:
+            if isinstance(tx, dict):
+                sender = tx["sender"].lower()
+                recipient = tx["recipient"].lower()
+                nonce = tx["nonce"]
+                data = tx["data"]
+            else:
+                sender = tx.sender.lower()
+                recipient = tx.recipient.lower()
+                nonce = tx.nonce
+                data = tx.data
 
-        with self.tokens_lock.gen_rlock():
-            token_exists = recipient in self.tokens
+            if (not data.strip()) or (data == '0x'):
+                return (True, logs, blank) if return_message else True
+            
+            with self.tokens_lock.gen_rlock():
+                token_match = recipient in self.tokens
 
-        if token_exists:
-            if len(data) != 138:
-                if simulate: return False
-                raise Exception('Invalid data length in token tx.')
+            if token_match:
+                if len(data) != 138:
+                    logs.append('Invalid data length')
+                    if simulate: return (False, logs) if return_message else False
+                    raise ExecutionError('Invalid data length')
 
-            method_id = data[:10]
-            if method_id == "0xa9059cbb":  # transfer(address,uint256)
-                token_recipient = '0x' + data[10:74][-40:]
-                token_amount = int(data[74:], 16)
+                method_id = data[:10]
+                if method_id == "0xa9059cbb":  # transfer(address,uint256)
+                    try:
+                        token_recipient = '0x' + data[10:74][-40:]
+                        token_amount = int(data[74:], 16)
+                    except Exception as e:
+                        logs.append('Invalid parameters')
+                        if simulate: return (False, logs) if return_message else False
+                        raise ExecutionError('Invalid parameters')
 
-                with self.tokens_lock.gen_rlock():
-                    sender_balance = self.tokens[recipient]["balances"].get(sender, 0)
+                    with self.tokens_lock.gen_rlock():
+                        sender_balance = self.tokens[recipient]["balances"].get(sender, 0)
 
-                if sender_balance < token_amount:
-                    if simulate: return False
-                    raise Exception('Insufficient token balance.')
-                if simulate: return True
+                    if sender_balance < token_amount:
+                        logs.append('Insufficient token balance')
+                        if simulate: return (None, logs) if return_message else None
+                        raise ExecutionError('Insufficient token balance.')
 
-                with self.tokens_lock.gen_wlock():
-                    self.tokens[recipient]["balances"][sender] -= token_amount
-                    self.tokens[recipient]["balances"][token_recipient] = \
-                        self.tokens[recipient]["balances"].get(token_recipient, 0) + token_amount
+                    if not simulate:
+                        with self.tokens_lock.gen_wlock():
+                            self.tokens[recipient]["balances"][sender] -= token_amount
+                            self.tokens[recipient]["balances"][token_recipient] = self.tokens[recipient]["balances"].get(token_recipient, 0) + token_amount
+                        written = True
+                        changes.append(("sub_token", recipient, sender, token_amount))
+                        changes.append(("add_token", recipient, token_recipient, token_amount))
+                    
+                else:
+                    logs.append(f'Unknown function {method_id}')
+                    if simulate: return (None, logs) if return_message else None
+                    raise ExecutionError(f'Unknown function {method_id}')
+
+            elif recipient == TOKEN_CONTRACT.lower():
+                try:
+                    f_params = hex_to_string(data).split(" ")
+                    f_id = f_params[0]
+                except Exception as e:
+                    logs.append('Malformed data')
+                    if simulate: return (False, logs) if return_message else False
+                    raise ExecutionError('Malformed data')
+
+                if f_id == "createToken":
+                    try:
+                        if len(f_params) < 6:
+                            logs.append('Invalid data length')
+                            if simulate: return (False, logs) if return_message else False
+                            raise ExecutionError('Invalid data length')
+                        authority = f_params[1].lower()
+                        initial_mint_address = f_params[2].lower()
+                        initial_mint_amount = int(f_params[3])
+                        symbol = f_params[4]
+                        name = ' '.join(f_params[5:])
+                    except Exception as e:
+                        logs.append('Invalid parameters')
+                        if simulate: return (False, logs) if return_message else False
+                        raise ExecutionError('Invalid parameters')
+                    token_address = string_to_hex_with_prefix(f'{nonce}token{sender}').lower()[:42]
+
+                    with self.tokens_lock.gen_rlock():
+                        if token_address in self.tokens:
+                            logs.append('Token address collision')
+                            if simulate: return (False, logs) if return_message else False
+                            # deterministic, because token addresses are immutable
+                            raise ExecutionError('Token address collision')
+
+                    if not simulate:
+                        with self.tokens_lock.gen_wlock():
+                            self.tokens[token_address] = {
+                                "authority": authority,
+                                "symbol": symbol,
+                                "name": name,
+                                "balances": {
+                                    initial_mint_address: initial_mint_amount
+                                }
+                            }
+                        written = True
+                        changes.append(("create_token", token_address))
+
+                elif f_id == "mintToken":
+                    try:
+                        if len(f_params) < 4:
+                            logs.append('Invalid data length')
+                            if simulate: return (False, logs) if return_message else False
+                            raise ExecutionError('Invalid data length')
+                        token_address = f_params[1].lower()
+                        mint_address = f_params[2].lower()
+                        mint_amount = int(f_params[3])
+                    except Exception as e:
+                        logs.append('Invalid parameters')
+                        if simulate: return (False, logs) if return_message else False
+                        raise ExecutionError('Invalid parameters')
+
+                    with self.tokens_lock.gen_rlock():
+                        token = self.tokens.get(token_address)
+                        if not token:
+                            logs.append('Token not found')
+                            if simulate: return (None, logs) if return_message else None
+                            raise ExecutionError('Token not found')
+                        if token.get("authority") != sender:
+                            logs.append('Not token authority')
+                            if simulate: return (None, logs) if return_message else None
+                            raise ExecutionError('Not token authority')
+
+                    if not simulate:
+                        with self.tokens_lock.gen_wlock():
+                            self.tokens[token_address]["balances"][mint_address] = self.tokens[token_address]["balances"].get(mint_address, 0) + mint_amount
+                        written = True
+                        changes.append(("add_token", token_address, mint_address, mint_amount))
+
+                else:
+                    logs.append(f'Unknown function {f_id}')
+                    if simulate: return (None, logs) if return_message else None
+                    raise ExecutionError(f'Unknown function {f_id}')
+                
+            else:
+                # call to a non-contract
+                pass
+
+            if written and not simulate:
                 self.save_tokens()
-
-        elif recipient == TOKEN_CONTRACT.lower():
-            f_params = hex_to_string(data).split(" ")
-            f_id = f_params[0]
-
-            if f_id == "createToken":
-                authority = f_params[1].lower()
-                initial_mint_address = f_params[2].lower()
-                initial_mint_amount = int(f_params[3])
-                symbol = f_params[4]
-                name = ' '.join(f_params[5:])
-                token_address = string_to_hex_with_prefix(f'{nonce}token{sender}').lower()[:42]
-
-                with self.tokens_lock.gen_rlock():
-                    if token_address in self.tokens:
-                        if simulate: return False
-                        raise Exception('Token address collision')
-                if simulate: return True
-
-                with self.tokens_lock.gen_wlock():
-                    self.tokens[token_address] = {
-                        "authority": authority,
-                        "symbol": symbol,
-                        "name": name,
-                        "balances": {
-                            initial_mint_address: initial_mint_amount
-                        }
-                    }
-                self.save_tokens()
-
-            elif f_id == "mintToken":
-                token_address = f_params[1].lower()
-                mint_address = f_params[2].lower()
-                mint_amount = int(f_params[3])
-
-                with self.tokens_lock.gen_rlock():
-                    if self.tokens.get(token_address, {}).get("authority") != sender:
-                        if simulate: return False
-                        raise Exception('Not token authority')
-                if simulate: return True
-
-                with self.tokens_lock.gen_wlock():
-                    self.tokens[token_address]["balances"][mint_address] = \
-                        self.tokens[token_address]["balances"].get(mint_address, 0) + mint_amount
-                self.save_tokens()
-
-        return True
-
-    def simulate_contract(self, tx):
-        return self._process_contract_interaction(tx, simulate=True)
+            if return_revert_fn and written:
+                def revert_fn():
+                    for op in reversed(changes):
+                        if op[0] == "add_token":
+                            self.tokens[op[1]]["balances"][op[2]] -= op[3]
+                        elif op[0] == "sub_token":
+                            self.tokens[op[1]]["balances"][op[2]] += op[3]
+                        elif op[0] == "create_token":
+                            del self.tokens[op[1]]
+                return True, logs, revert_fn
+            return (True, logs, blank) if return_message else True
+        except ExecutionError as e:
+            # rollback
+            for op in reversed(changes):
+                if op[0] == "add_token":
+                    self.tokens[op[1]]["balances"][op[2]] -= op[3]
+                elif op[0] == "sub_token":
+                    self.tokens[op[1]]["balances"][op[2]] += op[3]
+                elif op[0] == "create_token":
+                    del self.tokens[op[1]]
+            logs.append('Transaction reverted due to ExecutionError.')
+            return (False, logs, blank) if return_message else False
+        except Exception as e:
+            print(traceback.format_exc())
+            # rollback
+            for op in reversed(changes):
+                if op[0] == "add_token":
+                    self.tokens[op[1]]["balances"][op[2]] -= op[3]
+                elif op[0] == "sub_token":
+                    self.tokens[op[1]]["balances"][op[2]] += op[3]
+                elif op[0] == "create_token":
+                    del self.tokens[op[1]]
+            logs.append('Transaction reverted due to an unexpected error.')
+            logs.append(f"{e.__class__.__name__}: {e}")
+            return (False, logs, blank) if return_message else False
 
     def find_valid_parents(self, tx, parent_hashes=None):
         juice_needed = int(tx.amount + tx.gas)
@@ -385,16 +493,14 @@ class Core:
                 if parentstotaljuice >= juice_needed:
                     break
                 parent = self.get_tx_by_hash(parent_hash)
-                if not parent:
-                    continue
-                if parent.recipient.lower() == tx.sender.lower() and parent.juice > 0:
+                if parent and parent.recipient.lower() == tx.sender.lower() and parent.juice > 0 and parent.status == 1:
                     parents.append(parent)
                     parentstotaljuice += parent.juice
         else:
             with self.dag_lock.gen_rlock(): nodes_snapshot = dict(self.dag.nodes)
             for ptxn, node in nodes_snapshot.items():
                 ptx = node.get('transaction', None)
-                if ptx and ptx.recipient.lower() == tx.sender.lower():
+                if ptx and ptx.recipient.lower() == tx.sender.lower() and ptx.status == 1:
                     if juice_needed <= 0:
                         break
                     juice = int(ptx.juice)
@@ -407,43 +513,89 @@ class Core:
 
         return parents
 
-    def try_process_contract(self, tx):
-        if tx.data and tx.data != '0x':
-            try:
-                self._process_contract_interaction(tx)
-                return True
-            except Exception as e:
-                return False
-        return True
+    def finalize_and_broadcast(self, tx, parents, node_addr, miner_addr, miner_share):
+        try:
+            sender = tx.sender.lower()
+            recipient = tx.recipient.lower()
+            amount = int(tx.amount)
+            fee = int(tx.gas)
 
-    def finalize_and_broadcast(self, tx, parents, node_addr, miner_addr, miner_share): # broadcast to ws, not peers
-        sender = tx.sender.lower()
-        recipient = tx.recipient.lower()
-        amount = int(tx.amount)
-        fee = int(tx.gas)
+            # Process contract
+            contract_interaction = self.process_contract(tx, simulate=False, return_message=True, return_revert_fn=True)
+            result, logs, revert = contract_interaction
 
-        with self.dag_lock.gen_wlock():
-            finalizedtx = self.dag.add_transaction(sender, recipient, amount, fee, parents, tx.nonce, tx.data)
-            noderewardtx = self.dag.add_transaction(sender, node_addr, fee, 0, parents, finalizedtx.nonce + 1)
-        nodenonce = self.get_transaction_count(NODE_ADDRESS, "latest")
+            # Determine finalized tx status
+            status = 1 if result else 0
+            fee_status = 1
+            
+            # Determine total juice available from parents
+            full_deducts, partial_parent, partial_amount, total_found_juice = self.dag.select_parents(parents, amount + fee)
+            
+            # If not enough juice for amount, finalized tx fails
+            if total_found_juice < (amount + fee):
+                status = 0
+                if total_found_juice < fee:
+                    fee_status = 0
 
-        with self.dag_lock.gen_wlock():
-            minerrewardtx = self.dag.add_transaction(node_addr, miner_addr, fee * miner_share, 0, [noderewardtx], nodenonce)
+            nodenonce = self.get_transaction_count(NODE_ADDRESS, "latest")
+            finalizedtx = noderewardtx = minerrewardtx = None
+            final_parents = full_deducts + ([partial_parent] if partial_parent else [])
 
-        self.last_speed = finalizedtx.timestamp - tx.timestamp
-        self.remove_bad_nodes()
-        self.save_dag()
-        self.save_speed()
+            with self.dag_lock.gen_wlock():
+                # Add finalized tx (may fail, status=0)
+                if status == 0:
+                    finalizedtx = self.dag.add_transaction(
+                        sender, recipient, amount, fee, [], tx.nonce, tx.data, status=status, logs=logs,
+                    )
+                else:
+                    finalizedtx = self.dag.add_transaction(
+                        sender, recipient, amount, fee, final_parents, tx.nonce, tx.data, status=status, logs=logs,
+                        check_juice=False, full_deducts=full_deducts, partial_parent=partial_parent, partial_amount=partial_amount
+                    )
 
-        for tx_ in [finalizedtx, noderewardtx, minerrewardtx]:
-            self.ws.broadcast_tx(tx_)
+                if fee_status == 0:
+                    noderewardtx = self.dag.add_transaction(
+                        sender, node_addr, fee, 0, [], finalizedtx.nonce + 1, data="0x", status=fee_status,
+                        logs=[f'Node reward transaction for {finalizedtx.hash}']
+                    )
 
-        return finalizedtx, noderewardtx, minerrewardtx
+                    minerrewardtx = self.dag.add_transaction(
+                        node_addr, miner_addr, fee * miner_share, 0, [], nodenonce, data="0x", status=fee_status,
+                        logs=[f'Miner reward transaction for {finalizedtx.hash}']
+                    )
+                else:
+                    noderewardtx = self.dag.add_transaction(
+                        sender, node_addr, fee, 0, final_parents, finalizedtx.nonce + 1, data="0x", status=fee_status,
+                        logs=[f'Node reward transaction for {finalizedtx.hash}'],
+                    )
+
+                    minerrewardtx = self.dag.add_transaction(
+                        node_addr, miner_addr, fee * miner_share, 0, [noderewardtx], nodenonce, data="0x", status=fee_status,
+                        logs=[f'Miner reward transaction for {finalizedtx.hash}'],
+                    )
+
+            self.last_speed = finalizedtx.timestamp - tx.timestamp
+            self.remove_bad_nodes()
+            self.save_dag()
+            self.save_speed()
+
+            # Broadcast whatever txs were successfully added
+            for tx_ in [finalizedtx, noderewardtx, minerrewardtx]:
+                if tx_:
+                    self.ws.broadcast_tx(tx_)
+
+            return finalizedtx, noderewardtx, minerrewardtx
+        except:
+            print(traceback.format_exc())
+            return None, None, None
 
     def handle_peer_voting(self, finalizedtx, parents, fee, node_addr, miner, miner_share):
-        if len(self.p2p.peer_sockets) == 0:
+        if len(self.p2p._peers) == 0:
             return
-        with self.raw_txs_lock: raw_tx = self.raw_txs[finalizedtx.hash]
+        with self.raw_txs_lock: raw_tx = self.raw_txs.get(finalizedtx.hash)
+        if raw_tx == None:
+            print(f"Raw TX for {finalizedtx.hash} seems lost... :(")
+            raw_tx = 'lost'
         response = self.p2p.broadcast({
             "raw_tx": raw_tx,
             "timestamp": finalizedtx.timestamp,
@@ -483,15 +635,13 @@ class Core:
                 if not parents:
                     continue
 
-                if not self.simulate_contract(tx):
-                    continue
-
                 with self.picked_lock.gen_wlock(): self.picked = [p for p in self.picked if p["tx"].hash != tx.hash]
                 with self.funnel_cn:
                     self.funnel.append({
                         "tx": tx,
                         "parents": parents,
-                        "miner": miner
+                        "miner": miner,
+                        "source": "self",
                     })
                     self.funnel_cn.notify()
 
@@ -508,12 +658,12 @@ class Core:
     def process_received(self, data):
         try:
             raw_tx = data["raw_tx"]
+            if raw_tx == 'lost':
+                ## tf do i even do now??
+                return False
             decoded_tx = tx_decode(raw_tx)
 
             if int(decoded_tx['chainId']) != CHAIN_ID:
-                return False
-
-            if not verify_sign(decoded_tx):
                 return False
 
             sender = decoded_tx['from_']
@@ -533,7 +683,9 @@ class Core:
                 gas=gas,
                 parents=[],
                 nonce=nonce,
-                data=data_field
+                data=data_field,
+                status=1,
+                logs=[],
             )
 
             if (int(data["timestamp"]) < self.last_received_timestamp_ns) or (int(data["timestamp"]) > time.time_ns()):
@@ -561,7 +713,9 @@ class Core:
             if not parents:
                 return False
 
-            if not self.simulate_contract(tx):
+            # transaction hasnt come through send_raw_transaction (which already has a preflight),
+            # but through process_received (from other nodes, may or may not have preflighted)
+            if self.process_contract(tx, simulate=True) == False:
                 return False
 
             self.last_received_timestamp_ns = tx.timestamp
@@ -569,7 +723,8 @@ class Core:
                 self.funnel.append({
                     "tx": tx,
                     "parents": parents,
-                    "miner": miner
+                    "miner": miner,
+                    "source": "peer",
                 })
                 self.funnel_cn.notify()
             return True
@@ -592,16 +747,13 @@ class Core:
             if not parents:
                 return False
 
-            if not self.simulate_contract(tx):
-                with self.picked_lock.gen_wlock(): self.picked = [p for p in self.picked if p["tx"].hash != tx.hash] # drop
-                return False
-
             with self.picked_lock.gen_wlock(): self.picked = [p for p in self.picked if p["tx"].hash != tx.hash]
             with self.funnel_cn:
                 self.funnel.append({
                     "tx": tx,
                     "parents": parents,
-                    "miner": NETWORK_MINER
+                    "miner": NETWORK_MINER,
+                    "source": "self",
                 })
                 self.funnel_cn.notify()
 
@@ -674,15 +826,15 @@ class Core:
                     return tx
         return None
 
-    def send_raw_transaction(self, raw_tx):
+    def send_raw_transaction(self, raw_tx, skip_preflight: bool = True):
         try:
-            tx_dict = tx_decode(raw_tx)
+            try:
+                tx_dict = tx_decode(raw_tx)
+            except rlp.exceptions.DecodingError:
+                return {"error": f"Unsupported raw transaction: The raw transaction could not be decoded."}
 
             if not int(tx_dict['chainId']) == CHAIN_ID:
                 return {"error": f"Invalid transaction: chainId {tx_dict['chainId']} doesn't match {CHAIN_ID}."}
-
-            if not verify_sign(tx_dict):
-                return {'error': 'Invalid transaction. The signature verification failed, indicating the transaction was not signed by the sender. The reconstructed address does not match the provided address.'}
 
             sender = tx_dict['from_']
             recipient = tx_dict['to']
@@ -697,11 +849,27 @@ class Core:
             if amount < 0:
                 return {'error': 'Invalid amount. Amount must not be negative.'}
 
-            if (tx_dict['gas'] < fee) or (tx_dict['gasPrice'] != 1):
-                return {'error': f'Invalid gas values provided. Gas units required: {fee}, Gas Price: 1 wei'}
+            if (tx_dict['gas'] < fee):
+                return {'error': f'Invalid gas values provided. Minimum gas units required: {fee}'}
 
             if self.get_balance(sender, 'pending') < amount + fee:
                 return {'error': f"Not enough balance."}
+
+            simulation = self.process_contract({
+                            "sender": sender, 
+                            "recipient": recipient, 
+                            "amount": amount, 
+                            "fee": fee, 
+                            "nonce": nonce, 
+                            "data": data
+                        }, simulate=True, return_message=True)
+            
+            if skip_preflight: # only drops on deterministic errors
+                if simulation[0] == False:
+                    return {"error": f"Transaction rejected: {simulation[1]}"}
+            else:
+                if not simulation[0]:
+                    return {"error": f"Preflight failed: {simulation[1]}"}
 
             to_replace = self.find_pending(sender, nonce)
             if to_replace:
@@ -714,32 +882,6 @@ class Core:
 
             if not nonce == txcount:
                 return {'error': f'Invalid nonce provided: Given {nonce}, Expected {txcount}'}
-
-            tokens_snapshot = self.tokens.copy()
-
-            if recipient.lower() in tokens_snapshot:
-                if len(data) != 138:
-                    return {'error': 'Invalid data length. Must be 138 characters.'}
-                method_id = data[:10]
-                if method_id == "0xa9059cbb":
-                    token_recipient = '0x' + data[10:74][-40:]
-                    token_amount = int(data[74:], 16)
-                    if tokens_snapshot[recipient.lower()]["balances"].get(sender.lower(), 0) < token_amount:
-                        return {'error': f'Insufficient token balance.'}
-
-            if recipient.lower() == TOKEN_CONTRACT.lower():
-                f_params = hex_to_string(data).split(" ")
-                f_id = f_params[0]
-                if f_id == "createToken":
-                    token_address = string_to_hex_with_prefix(f'{nonce}token{sender.lower()}').lower()[:42]
-                    if token_address in tokens_snapshot:
-                        return {'error': f'A token with the address {token_address} already exists.'}
-                if f_id == "mintToken":
-                    token_address = f_params[1].lower()
-                    if token_address not in tokens_snapshot:
-                        return {'error': f'Token address {token_address} not found.'}
-                    if tokens_snapshot[token_address].get("authority") != sender.lower():
-                        return {'error': f'Only the token authority can mint tokens.'}
 
             tx = self.add_pending(sender, recipient, amount, fee, nonce, data)
             txh = tx.hash
@@ -764,14 +906,14 @@ class Core:
             'effectiveGasPrice': hex(1),
             'from': tx.sender,
             'gasUsed': hex(tx.gas),
-            'status': hex(1),
+            'status': hex(tx.status),
             'to': tx.recipient,
             'transactionHash': tx.hash,
-            'transactionIndex': hex(0), # since we dont have blocks, 1 tx = 1 tx = 1 block for evm compatibility
-            'type': 0,
-            'amount': hex(tx.amount),
+            'transactionIndex': "0x0", # since we dont have blocks, 1 tx = 1 tx = 1 block for evm compatibility
+            'type': "0x0",
+            'value': hex(tx.amount),
             'juiceLeft': hex(tx.juice),
-            'logs': [],
+            'logs': tx.logs,
         }
 
     def load_dag(self):
